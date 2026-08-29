@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Observation Arbitre">
-<script src="https://alcdn.msauth.net/browser/3.7.1/js/msal-browser.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <style>
   :root{
     --navy:#0a1f4d;
@@ -1455,7 +1455,9 @@ async function initMsal(){
     },
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
   });
-  await msalInstance.initialize();
+  if(typeof msalInstance.initialize === 'function'){
+    await msalInstance.initialize(); // requis en v3+, absent en v2 (ignoré ici)
+  }
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     msalAccount = accounts[0];
