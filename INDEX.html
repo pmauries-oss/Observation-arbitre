@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport d'Observateur — Arbitre Assistant</title>
+<style>
+  :root{
+    --navy:#0a1f4d;
+    --navy-dark:#071636;
+    --green:#2e7d4f;
+    --green-dark:#1f5c38;
+    --amber:#9a6a24;
+    --amber-dark:#7a5219;
+    --red:#b23a2f;
+    --red-dark:#8f2e25;
+    --purple:#3b2f6e;
+    --purple-dark:#2b2251;
+    --paper:#f6f5f1;
+    --card:#ffffff;
+    --ink:#1c2230;
+    --ink-soft:#5b6270;
+    --line:#dfdcd3;
+    --pf:#2e7d4f;
+    --qa:#2f6fb2;
+    --pa:#c4881f;
+    --ms:#b23a2f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Georgia', 'Times New Roman', serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:28px 16px 60px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+  .masthead{
+    background:var(--navy);
+    background-image:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+    color:#fff;
+    padding:22px 28px;
+    border-radius:10px 10px 0 0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+  }
+  .masthead h1{
+    font-size:1.5rem;
+    margin:0 0 4px;
+    letter-spacing:.3px;
+  }
+  .masthead p{
+    margin:0;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.78rem;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    opacity:.75;
+  }
+  .badge{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.7rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.35);
+    padding:6px 12px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .meta{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    padding:20px 28px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:14px 28px;
+  }
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.68rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field input{
+    font-family:inherit;
+    font-size:.95rem;
+    padding:7px 4px;
+    border:none;
+    border-bottom:1.5px solid var(--line);
+    background:transparent;
+    color:var(--ink);
+  }
+  .field input:focus{outline:none;border-bottom-color:var(--navy);}
+
+  .legend{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.75rem;
+    color:var(--ink-soft);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    padding:10px 28px;
+  }
+  .legend b{color:var(--ink);}
+
+  .section{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    overflow:hidden;
+  }
+  .section-head{
+    padding:11px 28px;
+    color:#fff;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.82rem;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .sec-physique .section-head{background:var(--green);}
+  .sec-technique .section-head{background:var(--amber);}
+  .sec-horsjeu .section-head{background:var(--red);}
+  .sec-personnalite .section-head{background:var(--purple);}
+
+  .row{
+    display:grid;
+    grid-template-columns:1fr 220px;
+    gap:10px 20px;
+    padding:13px 28px;
+    border-top:1px solid var(--line);
+    align-items:start;
+  }
+  .row:first-of-type{border-top:none;}
+  .crit{font-size:.92rem;line-height:1.35;padding-top:6px;}
+  .opts{display:flex;gap:6px;}
+  .opt{position:relative;flex:1;}
+  .opt input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0;}
+  .opt span{
+    display:flex;align-items:center;justify-content:center;
+    height:32px;border-radius:6px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.72rem;font-weight:700;letter-spacing:.5px;
+    border:1.5px solid var(--line);
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .opt input:checked + span{color:#fff;}
+  .opt.pf input:checked + span{background:var(--pf);border-color:var(--pf);}
+  .opt.qa input:checked + span{background:var(--qa);border-color:var(--qa);}
+  .opt.pa input:checked + span{background:var(--pa);border-color:var(--pa);}
+  .opt.ms input:checked + span{background:var(--ms);border-color:var(--ms);}
+  .opt span:hover{border-color:#aeb1a8;}
+  .comment{
+    grid-column:1 / -1;
+  }
+  .comment textarea{
+    width:100%;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.82rem;
+    color:var(--ink-soft);
+    border:1px dashed var(--line);
+    border-radius:6px;
+    background:#fbfaf7;
+    padding:8px 10px;
+    resize:vertical;
+    min-height:34px;
+  }
+  .comment textarea:focus{outline:none;border-color:var(--navy);color:var(--ink);}
+
+  .sub-score{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.72rem;
+    color:var(--ink-soft);
+    padding:8px 28px 14px;
+    text-align:right;
+    border-top:1px dashed var(--line);
+  }
+  .sub-score b{color:var(--ink);}
+
+  .bilan{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    padding:22px 28px;
+    display:grid;
+    grid-template-columns:200px 1fr;
+    gap:20px 28px;
+  }
+  .bilan-title{
+    grid-column:1/-1;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.78rem;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--navy);
+    border-bottom:2px solid var(--navy);
+    padding-bottom:8px;
+  }
+  .checks label{
+    display:flex;align-items:center;gap:8px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.85rem;
+    margin-bottom:10px;
+    cursor:pointer;
+  }
+  .checks input{width:16px;height:16px;accent-color:var(--navy);}
+  .app-block label{
+    display:block;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.68rem;letter-spacing:1px;text-transform:uppercase;
+    color:var(--ink-soft);margin-bottom:6px;
+  }
+  .app-block textarea{
+    width:100%;font-family:inherit;font-size:.9rem;
+    border:1px solid var(--line);border-radius:6px;
+    padding:10px;min-height:56px;resize:vertical;background:#fbfaf7;
+  }
+  .app-block textarea:focus{outline:none;border-color:var(--navy);}
+  .app-block + .app-block{margin-top:14px;}
+
+  .noteBox{
+    grid-column:1/-1;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+    border-radius:10px;
+    padding:20px 28px;
+    color:#fff;
+    margin-top:6px;
+  }
+  .noteBox .label{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.75rem;letter-spacing:1.5px;text-transform:uppercase;opacity:.8;
+  }
+  .noteBox .value{
+    font-size:2.6rem;font-weight:700;line-height:1;
+    display:flex;align-items:baseline;gap:6px;
+  }
+  .noteBox .value span{font-size:1.1rem;opacity:.65;font-weight:400;}
+  .noteBox .hint{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.72rem;opacity:.7;max-width:260px;text-align:right;
+  }
+  .noteBox .value.manual{color:#ffd479;}
+
+  .indemn-wrap{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    padding:20px 28px;
+  }
+  .indemn-title{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.78rem;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--navy);
+    border-bottom:2px solid var(--navy);
+    padding-bottom:8px;
+    margin-bottom:16px;
+  }
+  .indemn-grid{
+    display:grid;
+    grid-template-columns:220px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  .indemn-detail{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.85rem;
+    color:var(--ink-soft);
+  }
+  .indemn-detail div{
+    display:flex;justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px dashed var(--line);
+  }
+  .indemn-detail div b{color:var(--ink);font-weight:700;}
+  .indemn-total{
+    display:flex;justify-content:space-between;
+    padding:12px 0 0;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:1.15rem;
+    color:var(--navy);
+  }
+  .indemn-note{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.68rem;
+    color:var(--ink-soft);
+    margin-top:10px;
+  }
+  .type-toggle{
+    display:flex;
+    gap:0;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+  }
+  .type-toggle button{
+    flex:1;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.85rem;
+    letter-spacing:.5px;
+    padding:14px 10px;
+    border:none;
+    background:#fff;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+  }
+  .type-toggle button + button{border-left:1px solid var(--line);}
+  .type-toggle button.active{
+    background:#eef0f5;
+    color:var(--navy);
+    border-bottom-color:var(--navy);
+  }
+  .type-toggle button:hover{background:#f6f5f1;}
+  .bareme-hint{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.72rem;
+    color:var(--ink-soft);
+    margin-top:8px;
+    padding:8px 10px;
+    background:#eef0f5;
+    border-radius:6px;
+  }
+  .bareme-hint b{color:var(--navy);}
+  .footer{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+    border-radius:0 0 10px 10px;
+    padding:18px 28px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+  .footer .field input{border-bottom-color:var(--line);}
+
+  .progress{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.68rem;
+    color:var(--ink-soft);
+    text-align:center;
+    margin-top:14px;
+  }
+
+  /* Tabs */
+  .tabnav{
+    display:flex;
+    background:var(--navy-dark);
+    border-radius:0;
+  }
+  .tabnav button{
+    flex:1;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.78rem;
+    font-weight:700;
+    letter-spacing:.8px;
+    text-transform:uppercase;
+    background:transparent;
+    color:rgba(255,255,255,.55);
+    border:none;
+    border-bottom:3px solid transparent;
+    padding:13px 10px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tabnav button:hover{color:rgba(255,255,255,.85);}
+  .tabnav button.active{
+    color:#fff;
+    border-bottom-color:var(--pa);
+    background:rgba(255,255,255,.05);
+  }
+  .tabpanel{display:none;}
+  .tabpanel.active{display:block;}
+
+  /* Chronology tab */
+  .chrono-wrap{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-top:none;
+  }
+  .chrono-intro{
+    padding:16px 28px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.78rem;
+    color:var(--ink-soft);
+    border-bottom:1px solid var(--line);
+  }
+  .chrono-add{
+    display:grid;
+    grid-template-columns:90px 150px 1fr auto;
+    gap:10px;
+    padding:18px 28px;
+    border-bottom:1px solid var(--line);
+    align-items:end;
+    background:#fbfaf7;
+  }
+  .chrono-add .field label{margin-bottom:4px;}
+  .chrono-add input, .chrono-add select{
+    font-family:inherit;
+    font-size:.9rem;
+    padding:8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+  }
+  .chrono-add input:focus, .chrono-add select:focus{outline:none;border-color:var(--navy);}
+  .chrono-add button{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.8rem;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    background:var(--navy);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:10px 18px;
+    cursor:pointer;
+  }
+  .chrono-add button:hover{background:var(--navy-dark);}
+  .chrono-list{padding:8px 28px 24px;}
+  .chrono-empty{
+    padding:30px 0;
+    text-align:center;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.85rem;
+    color:var(--ink-soft);
+  }
+  .chrono-item{
+    display:grid;
+    grid-template-columns:56px 110px 1fr 30px;
+    gap:14px;
+    align-items:start;
+    padding:12px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .chrono-item:last-child{border-bottom:none;}
+  .chrono-min{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.95rem;
+    color:var(--navy);
+    background:#eef0f5;
+    border-radius:6px;
+    text-align:center;
+    padding:6px 0;
+  }
+  .chrono-tag{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.68rem;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    padding:6px 8px;
+    border-radius:6px;
+    text-align:center;
+    align-self:start;
+    color:#fff;
+  }
+  .chrono-text{font-size:.92rem;line-height:1.4;padding-top:4px;}
+  .chrono-del{
+    background:none;border:none;cursor:pointer;
+    color:var(--ink-soft);font-size:1rem;line-height:1;
+    padding:4px;
+  }
+  .chrono-del:hover{color:var(--red);}
+
+  .chrono-clock{
+    padding:22px 28px 26px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+    color:#fff;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    text-align:center;
+  }
+  .clock-time{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:2.6rem;
+    font-weight:700;
+    line-height:1;
+    min-width:150px;
+  }
+  .clock-status{
+    font-size:.7rem;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    opacity:.7;
+    margin-top:6px;
+  }
+  .clock-stoppage{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.78rem;
+    opacity:.85;
+    margin-top:4px;
+  }
+  .clock-log{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .clock-log-empty{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.72rem;
+    opacity:.55;
+  }
+  .clock-notif{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.78rem;
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:7px;
+    padding:8px 12px;
+    animation:notifIn .25s ease;
+  }
+  .clock-notif.start{border-left:3px solid var(--pa);}
+  .clock-notif.stop{border-left:3px solid var(--pf);}
+  .clock-notif .n-min{font-weight:700;opacity:.85;}
+  .goals-wrap{
+    padding:18px 28px;
+    border-bottom:1px solid var(--line);
+    background:#f6f5f1;
+  }
+  .goals-score{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:1.15rem;
+    color:var(--navy);
+    text-align:center;
+    margin-bottom:14px;
+  }
+  .goals-score span{color:var(--ink-soft);font-weight:400;font-size:.9rem;}
+  .goals-btn-row{display:flex;justify-content:center;}
+  #btn-but{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.9rem;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    background:var(--pf);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:12px 26px;
+    cursor:pointer;
+  }
+  #btn-but:hover{background:var(--green-dark);}
+  .goals-chooser{
+    display:none;
+    justify-content:center;
+    gap:14px;
+    margin-top:14px;
+  }
+  .goals-chooser.open{display:flex;}
+  .goals-chooser button{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.85rem;
+    background:#fff;
+    border:2px solid var(--navy);
+    color:var(--navy);
+    border-radius:8px;
+    padding:12px 22px;
+    cursor:pointer;
+  }
+  .goals-chooser button:hover{background:var(--navy);color:#fff;}
+  .goals-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+  .goal-entry{
+    display:flex;align-items:center;gap:10px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.82rem;
+    padding:7px 10px;
+    border-radius:6px;
+    background:#fff;
+    border:1px solid var(--line);
+    animation:notifIn .25s ease;
+  }
+  .goal-entry .g-min{margin-left:auto;font-weight:700;color:var(--ink-soft);font-size:.76rem;}
+    padding:18px 28px;
+    border-bottom:1px solid var(--line);
+    background:#fbfaf7;
+  }
+  .cards-title{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.72rem;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin-bottom:12px;
+  }
+  .cards-add{
+    display:grid;
+    grid-template-columns:1fr 110px 130px auto;
+    gap:10px;
+    align-items:end;
+  }
+  .cards-add .field label{margin-bottom:4px;}
+  .cards-add input, .cards-add select{
+    font-family:inherit;
+    font-size:.9rem;
+    padding:8px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+  }
+  .cards-add input:focus, .cards-add select:focus{outline:none;border-color:var(--navy);}
+  .cards-add button{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.8rem;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    background:var(--navy);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:10px 18px;
+    cursor:pointer;
+  }
+  .cards-add button:hover{background:var(--navy-dark);}
+  .cards-list{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .card-entry{
+    display:flex;align-items:center;gap:10px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:.85rem;
+    padding:9px 12px;
+    border-radius:7px;
+    background:#fff;
+    border:1px solid var(--line);
+    animation:notifIn .25s ease;
+  }
+  .card-chip{
+    width:16px;height:22px;border-radius:2px;flex-shrink:0;
+  }
+  .card-chip.jaune{background:#f2c11c;}
+  .card-chip.rouge{background:var(--ms);}
+  .card-chip.blanc{background:#ffffff;border:1.5px solid #9aa0ab;}
+  .card-entry .c-min{margin-left:auto;font-weight:700;color:var(--ink-soft);font-size:.78rem;}
+  .card-entry.urgent{
+    background:#fdecea;
+    border:1.5px solid var(--ms);
+    color:var(--red-dark);
+    font-weight:700;
+    animation:urgentPulse 1.4s ease-in-out 2;
+  }
+  @keyframes urgentPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(178,58,47,.4);}
+    50%{box-shadow:0 0 0 6px rgba(178,58,47,0);}
+  }
+  @keyframes notifIn{
+    from{opacity:0;transform:translateY(-6px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  .clock-stoppage b{color:#ffd479;}
+  .clock-buttons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    justify-content:center;
+  }
+  .clock-buttons button{
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-weight:700;
+    font-size:.8rem;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    border:1.5px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.08);
+    color:#fff;
+    border-radius:8px;
+    padding:13px 20px;
+    cursor:pointer;
+    transition:all .12s ease;
+    min-width:150px;
+  }
+  .clock-buttons button:hover{background:rgba(255,255,255,.2);}
+  .clock-buttons button.primary{background:var(--pf);border-color:var(--pf);}
+  .clock-buttons button.primary:hover{background:var(--green-dark);}
+  .clock-buttons button.stop-btn{background:var(--red);border-color:var(--red);}
+  .clock-buttons button.stop-btn:hover{background:var(--red-dark);}
+  .clock-buttons button.arret{background:var(--pa);border-color:var(--pa);}
+  .clock-buttons button.arret.active{background:var(--red);border-color:var(--red);}
+  @media(max-width:640px){
+    .row{grid-template-columns:1fr;}
+    .meta,.bilan,.footer{grid-template-columns:1fr;}
+    .masthead{flex-direction:column;align-items:flex-start;}
+    .chrono-add{grid-template-columns:1fr 1fr;}
+    .chrono-item{grid-template-columns:44px 1fr 24px;}
+    .chrono-tag{grid-column:1/-1;justify-self:start;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>Rapport d'Observateur — Arbitre Assistant</h1>
+      <p>Commission Départementale de l'Arbitrage</p>
+    </div>
+    <div class="badge">Note calculée en direct</div>
+  </div>
+
+  <div class="tabnav">
+    <button type="button" class="active" data-tab="rapport">Rapport d'observation</button>
+    <button type="button" data-tab="chrono">Minute par minute</button>
+  </div>
+
+  <div class="tabpanel active" id="tabpanel-rapport">
+
+  <div class="meta">
+    <div class="field"><label>Compétition</label><input type="text" id="f-competition"></div>
+    <div class="field"><label>Match</label><input type="text" id="f-match"></div>
+    <div class="field"><label>Arbitre Assistant</label><input type="text" id="f-aa"></div>
+    <div class="field"><label>Catégorie</label><input type="text" id="f-cat"></div>
+    <div class="field"><label>Arbitre</label><input type="text" id="f-arbitre"></div>
+    <div class="field"><label>Observateur</label><input type="text" id="f-observateur"></div>
+    <div class="field"></div>
+    <div class="field"><label>Club Domicile</label><input type="text" id="f-club-dom"></div>
+    <div class="field"><label>Division / Poule (Domicile)</label>
+      <div style="display:flex;gap:10px;">
+        <input type="text" id="f-div-dom" placeholder="Division">
+        <input type="text" id="f-poule-dom" placeholder="Poule">
+      </div>
+    </div>
+    <div class="field"><label>Club Extérieur</label><input type="text" id="f-club-ext"></div>
+    <div class="field"><label>Division / Poule (Extérieur)</label>
+      <div style="display:flex;gap:10px;">
+        <input type="text" id="f-div-ext" placeholder="Division">
+        <input type="text" id="f-poule-ext" placeholder="Poule">
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <b>PF</b> Point Fort &nbsp;·&nbsp; <b>QA</b> Qualité Acquise &nbsp;·&nbsp; <b>PA</b> Point à Améliorer &nbsp;·&nbsp; <b>MS</b> Manquement Significatif
+  </div>
+
+  <div class="type-toggle">
+    <button type="button" id="type-assistant" class="active">Arbitre Assistant</button>
+    <button type="button" id="type-central">Arbitre Central</button>
+  </div>
+
+  <!-- sections injected by JS -->
+  <div id="sections"></div>
+
+  <div class="noteBox" id="noteBox">
+    <div>
+      <div class="label">Note globale</div>
+      <div class="progress" id="progress" style="text-align:left;margin-top:6px;opacity:.8;"></div>
+    </div>
+    <div class="value" id="noteValue">— <span>/ 20</span></div>
+    <div class="hint">Moyenne des items évalués : PF = 20, QA = 13, PA = 7, MS = 0. Modifiable manuellement ci-dessous si besoin.</div>
+  </div>
+
+  <div class="bilan">
+    <div class="bilan-title">Bilan de la prestation</div>
+
+    <div class="checks">
+      <label><input type="radio" name="bilan" value="Excellent arbitrage"> Excellent arbitrage</label>
+      <label><input type="radio" name="bilan" value="Arbitrage conforme"> Arbitrage conforme</label>
+      <label><input type="radio" name="bilan" value="Arbitrage à améliorer"> Arbitrage à améliorer</label>
+      <div class="field" style="margin-top:16px;">
+        <label>Note manuelle (facultatif)</label>
+        <input type="number" id="f-notemanuelle" min="0" max="20" step="0.1" placeholder="ex : 15.5">
+      </div>
+    </div>
+
+    <div>
+      <div class="app-block">
+        <label>Appréciation générale</label>
+        <textarea id="f-appreciation"></textarea>
+      </div>
+      <div class="app-block">
+        <label>Points forts de l'arbitre</label>
+        <textarea id="f-forts"></textarea>
+      </div>
+      <div class="app-block">
+        <label>Points d'amélioration de l'arbitre</label>
+        <textarea id="f-ameliorer"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="indemn-wrap">
+    <div class="indemn-title">Indemnités</div>
+    <div class="indemn-grid">
+      <div class="field"><label>Kilomètres parcourus (aller)</label><input type="number" id="f-km" min="0" step="1" placeholder="ex : 32"></div>
+      <div>
+        <div class="indemn-detail">
+          <div><span>Indemnité de rapport de match</span><b>20,00 €</b></div>
+          <div><span>Indemnité de déplacement</span><b id="indemn-dep">—</b></div>
+        </div>
+        <div class="indemn-total"><span>Total à toucher</span><span id="indemn-total">—</span></div>
+        <div class="indemn-note">Barème au 1er août 2026 : 40€ forfaitaire de 0 à 45 km (aller) ; au-delà, 0,892 €/km aller, plafonné à 89,20 €.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="field"><label>Observateur</label><input type="text" id="f-observateur2" placeholder="signature / nom"></div>
+    <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+    <div class="field" style="grid-column:1/-1;">
+      <label>&nbsp;</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="btn-pick-folder" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.5px;text-transform:uppercase;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:6px;padding:11px 18px;cursor:pointer;">📁 Choisir mon dossier OneDrive</button>
+        <button type="button" id="btn-export" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.5px;text-transform:uppercase;background:var(--navy);color:#fff;border:none;border-radius:6px;padding:12px 20px;cursor:pointer;">⬇ Enregistrer le match</button>
+      </div>
+      <div id="folder-status" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);margin-top:8px;">Aucun dossier choisi — le fichier sera téléchargé normalement. Cliquez sur « Choisir mon dossier OneDrive » (une seule fois) pour un enregistrement direct sans téléchargement.</div>
+    </div>
+  </div>
+
+  </div><!-- /tabpanel-rapport -->
+
+  <div class="tabpanel" id="tabpanel-chrono">
+    <div class="chrono-wrap">
+      <div class="chrono-clock">
+        <div>
+          <div class="clock-time" id="clock-time">00:00</div>
+          <div class="clock-status" id="clock-status">Avant-match</div>
+          <div class="clock-stoppage" id="clock-stoppage">Temps d'arrêt cumulé : <b>0:00</b></div>
+        </div>
+        <div class="clock-buttons" id="clock-buttons"></div>
+        <div class="clock-log" id="clock-log"></div>
+      </div>
+      <div class="goals-wrap">
+        <div class="goals-score" id="goals-score">Domicile <span>0</span> — <span>0</span> Extérieur</div>
+        <div class="goals-btn-row"><button type="button" id="btn-but">⚽ But</button></div>
+        <div class="goals-chooser" id="goals-chooser">
+          <button type="button" id="btn-but-dom">Domicile</button>
+          <button type="button" id="btn-but-ext">Extérieur</button>
+        </div>
+        <div class="goals-list" id="goals-list"></div>
+      </div>
+      <div class="cards-wrap">
+        <div class="cards-title">Cartons</div>
+        <div class="cards-add">
+          <div class="field"><label>Équipe</label>
+            <select id="cd-team">
+              <option value="Domicile" id="opt-dom">Domicile</option>
+              <option value="Extérieur" id="opt-ext">Extérieur</option>
+            </select>
+          </div>
+          <div class="field"><label>N° joueur</label><input type="number" id="cd-num" min="1" max="99" placeholder="ex : 8"></div>
+          <div class="field"><label>Carton</label>
+            <select id="cd-type">
+              <option value="jaune">Jaune</option>
+              <option value="blanc">Blanc (10 min dehors)</option>
+              <option value="rouge">Rouge direct</option>
+            </select>
+          </div>
+          <button type="button" id="cd-add">Enregistrer</button>
+        </div>
+        <div class="cards-list" id="cards-list"></div>
+      </div>
+      <div class="chrono-intro">Notez ce qui se passe minute par minute : décisions, incidents, hors-jeu litigieux, échanges avec l'arbitre… Les entrées sont triées automatiquement par minute.</div>
+      <div class="chrono-add">
+        <div class="field"><label>Minute</label><input type="number" id="c-min" min="0" max="130" placeholder="ex : 34"></div>
+        <div class="field"><label>Type</label>
+          <select id="c-type">
+            <option value="neutre">Constat</option>
+            <option value="pf">Point fort</option>
+            <option value="pa">À améliorer</option>
+            <option value="ms">Manquement</option>
+          </select>
+        </div>
+        <div class="field"><label>Description</label><input type="text" id="c-text" placeholder="ex : hors-jeu bien jugé sur contre-attaque"></div>
+        <button type="button" id="c-add">Ajouter</button>
+      </div>
+      <div class="chrono-list" id="chrono-list"></div>
+    </div>
+  </div><!-- /tabpanel-chrono -->
+
+</div>
+
+<script>
+const DATA_ASSISTANT = [
+  { key:"physique", cls:"sec-physique", title:"Qualités athlétiques au service du jeu", items:[
+    "Potentiel physique",
+    "Utilisation des différentes courses (sprint, arrière, latérale)",
+    "Aptitudes à suivre le jeu et réactivité",
+    "Respect de l'alignement sur l'avant dernier défenseur et des directives CRA",
+    "Placement sur les remises en jeu"
+  ]},
+  { key:"technique", cls:"sec-technique", title:"Compétences techniques", items:[
+    "Justesse des décisions (RT, Corner, CPB)",
+    "Signalisations claires, lisibles et adaptées",
+    "Application des lois du jeu",
+    "Respect des directives et instructions CRA",
+    "Maîtrise la notion d'avantage dans sa zone de proximité"
+  ]},
+  { key:"horsjeu", cls:"sec-horsjeu", title:"Jugement du hors-jeu", items:[
+    "Justesse des décisions",
+    "Différencie le hors-jeu actif ou passif",
+    "Pratique positivement la notion d'attendre et voir",
+    "Discernement, réactivité et prise de risque (avantage à l'attaque)"
+  ]},
+  { key:"personnalite", cls:"sec-personnalite", title:"Personnalité et collaboration", items:[
+    "Collaboration avec l'arbitre (avant, pendant et après)",
+    "Aide au contrôle du jeu et disciplinaire",
+    "Prévention des conflits naissants de proximité",
+    "Maîtrise émotionnelle, ingérence, courage",
+    "Relationnel avec les acteurs du terrain"
+  ]}
+];
+
+const DATA_CENTRAL = [
+  { key:"physique", cls:"sec-physique", title:"Qualités athlétiques au service du jeu", items:[
+    "Activité et condition physique, endurance",
+    "Changement de rythme en adéquation avec l'évolution du jeu",
+    "Placements sur remises en jeu",
+    "Occupation adaptée de l'aire de jeu (diagonale) et anticipation",
+    "Utilisation de la course à reculons"
+  ]},
+  { key:"technique", cls:"sec-technique", title:"Compétences techniques", items:[
+    "Application des lois du jeu, exécution des remises en jeu (ballons arrêtés, murs, coup franc, rentrée de touche)",
+    "Détection des fautes, application de l'avantage",
+    "Lisibilité des décisions, signalisations claires",
+    "Protection des joueurs (tacles, semelles)",
+    "Coup de sifflet net et sans équivoque (tonalité, sonorité)",
+    "Procédures des remplacements et des joueurs blessés"
+  ]},
+  { key:"disciplinaire", cls:"sec-horsjeu", title:"Compétences disciplinaires", items:[
+    "Prévention et dissuasion par le Rappel à l'Ordre",
+    "Procédure de délivrance des sanctions disciplinaires",
+    "Utilisation d'une manière cohérente et pertinente des sanctions disciplinaires (avertissement/exclusion)"
+  ]},
+  { key:"personnalite", cls:"sec-personnalite", title:"Personnalité et management", items:[
+    "Autorité naturelle (se faire respecter sans autoritarisme)",
+    "Collaboration avec les assistants",
+    "Courage et prise de responsabilités",
+    "Relationnel avec le délégué, les dirigeants, les capitaines (consignes), les joueurs, l'observateur",
+    "Devoirs administratifs"
+  ]}
+];
+
+let observationType = 'assistant';
+let DATA = DATA_ASSISTANT;
+
+const POINTS = { PF:20, QA:13, PA:7, MS:0 };
+const container = document.getElementById('sections');
+let totalItems = 0;
+
+function renderSections(){
+  container.innerHTML = '';
+  totalItems = 0;
+  DATA.forEach(section => {
+    const sec = document.createElement('div');
+    sec.className = 'section ' + section.cls;
+    let rows = '';
+    section.items.forEach((label, i) => {
+      const name = section.key + '-' + i;
+      totalItems++;
+      rows += `
+        <div class="row">
+          <div class="crit">${label}</div>
+          <div class="opts">
+            <label class="opt pf"><input type="radio" name="${name}" value="PF"><span>PF</span></label>
+            <label class="opt qa"><input type="radio" name="${name}" value="QA"><span>QA</span></label>
+            <label class="opt pa"><input type="radio" name="${name}" value="PA"><span>PA</span></label>
+            <label class="opt ms"><input type="radio" name="${name}" value="MS"><span>MS</span></label>
+          </div>
+          <div class="comment"><textarea placeholder="Constats et conseils…" data-crit="${name}"></textarea></div>
+        </div>`;
+    });
+    sec.innerHTML = `<div class="section-head">${section.title}</div>${rows}
+      <div class="sub-score" data-sub="${section.key}">Sous-total : <b>—</b></div>`;
+    container.appendChild(sec);
+  });
+}
+renderSections();
+
+function computeScore(){
+  let sum = 0, count = 0;
+  const perSection = {};
+  DATA.forEach(s => perSection[s.key] = {sum:0,count:0});
+
+  DATA.forEach(section => {
+    section.items.forEach((label,i) => {
+      const name = section.key + '-' + i;
+      const checked = document.querySelector(`input[name="${name}"]:checked`);
+      if(checked){
+        const pts = POINTS[checked.value];
+        sum += pts; count++;
+        perSection[section.key].sum += pts;
+        perSection[section.key].count++;
+      }
+    });
+  });
+
+  DATA.forEach(section => {
+    const el = document.querySelector(`[data-sub="${section.key}"] b`);
+    const p = perSection[section.key];
+    el.textContent = p.count ? (p.sum/p.count).toFixed(1) + ' / 20' : '—';
+  });
+
+  document.getElementById('progress').textContent = `${count} / ${totalItems} critères évalués`;
+
+  const manual = document.getElementById('f-notemanuelle').value;
+  const valueEl = document.getElementById('noteValue');
+  if(manual !== ''){
+    valueEl.innerHTML = parseFloat(manual).toFixed(1) + ' <span>/ 20</span>';
+    valueEl.classList.add('manual');
+  } else if(count > 0){
+    const note = sum / count;
+    valueEl.innerHTML = note.toFixed(1) + ' <span>/ 20</span>';
+    valueEl.classList.remove('manual');
+  } else {
+    valueEl.innerHTML = '— <span>/ 20</span>';
+    valueEl.classList.remove('manual');
+  }
+}
+
+container.addEventListener('change', computeScore);
+document.getElementById('f-notemanuelle').addEventListener('input', computeScore);
+computeScore();
+
+// --- Type d'observation (Arbitre Central / Arbitre Assistant) ---
+function switchObservationType(type){
+  if(type === observationType) return;
+  const hasEntries = !!container.querySelector('input[type="radio"]:checked');
+  if(hasEntries && !confirm("Changer de type d'observation réinitialisera les critères déjà remplis (les autres champs sont conservés). Continuer ?")){
+    return;
+  }
+  observationType = type;
+  DATA = (type === 'central') ? DATA_CENTRAL : DATA_ASSISTANT;
+  document.getElementById('type-assistant').classList.toggle('active', type === 'assistant');
+  document.getElementById('type-central').classList.toggle('active', type === 'central');
+  renderSections();
+  computeScore();
+  updateBaremeHint();
+}
+document.getElementById('type-assistant').addEventListener('click', () => switchObservationType('assistant'));
+document.getElementById('type-central').addEventListener('click', () => switchObservationType('central'));
+
+function updateBaremeHint(){
+  let hintEl = document.getElementById('bareme-hint');
+  const bilanDiv = document.querySelector('.checks');
+  if(!hintEl){
+    hintEl = document.createElement('div');
+    hintEl.id = 'bareme-hint';
+    hintEl.className = 'bareme-hint';
+    bilanDiv.appendChild(hintEl);
+  }
+  hintEl.style.display = 'block';
+  const noteText = document.getElementById('noteValue').textContent;
+  const note = parseFloat(noteText);
+  let appr = '—';
+  if(!isNaN(note)){
+    if(note >= 16.50) appr = 'Arbitrage Excellent';
+    else if(note >= 15.00) appr = 'Arbitrage Conforme';
+    else if(note >= 13.50) appr = 'Arbitrage à Améliorer';
+    else appr = 'Arbitrage Insuffisant';
+  }
+  const label = observationType === 'central' ? 'Barème central' : 'Barème assistant';
+  hintEl.innerHTML = `${label} : 16,50+ = Excellent · 15,00–16,45 = Conforme · 13,50–14,95 = À Améliorer · 12,00–13,45 = Insuffisant.<br><b>Suggestion selon la note actuelle : ${appr}</b>`;
+}
+container.addEventListener('change', updateBaremeHint);
+document.getElementById('f-notemanuelle').addEventListener('input', updateBaremeHint);
+updateBaremeHint();
+
+// --- Indemnités (barème 1er août 2026) ---
+const RAPPORT_INDEMN = 20;
+function computeIndemnites(){
+  const kmVal = document.getElementById('f-km').value;
+  const depEl = document.getElementById('indemn-dep');
+  const totalEl = document.getElementById('indemn-total');
+  if(kmVal === ''){
+    depEl.textContent = '—';
+    totalEl.textContent = '—';
+    return { deplacement: null, total: null, km: null };
+  }
+  const km = parseFloat(kmVal);
+  let dep;
+  if(km <= 45){
+    dep = 40;
+  } else {
+    dep = Math.min(km * 0.892, 89.20);
+  }
+  const total = RAPPORT_INDEMN + dep;
+  depEl.textContent = dep.toFixed(2) + ' €';
+  totalEl.textContent = total.toFixed(2) + ' €';
+  return { deplacement: +dep.toFixed(2), total: +total.toFixed(2), km };
+}
+document.getElementById('f-km').addEventListener('input', () => { computeIndemnites(); autoSaveIfFolderChosen(); });
+computeIndemnites();
+
+// --- Tabs ---
+document.querySelectorAll('.tabnav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabnav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tabpanel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// --- Chronologie minute par minute ---
+const TAG_LABEL = { neutre:'Constat', pf:'Point fort', pa:'À améliorer', ms:'Manquement' };
+const TAG_COLOR = { neutre:'#5b6270', pf:'var(--pf)', pa:'var(--pa)', ms:'var(--ms)' };
+let chronoEntries = [];
+
+function renderChrono(){
+  const list = document.getElementById('chrono-list');
+  if(chronoEntries.length === 0){
+    list.innerHTML = '<div class="chrono-empty">Aucune note pour l\'instant — ajoutez la première ci-dessus.</div>';
+    return;
+  }
+  const sorted = [...chronoEntries].sort((a,b) => a.min - b.min);
+  list.innerHTML = sorted.map(e => `
+    <div class="chrono-item">
+      <div class="chrono-min">${e.min}'</div>
+      <div class="chrono-tag" style="background:${TAG_COLOR[e.type]}">${TAG_LABEL[e.type]}</div>
+      <div class="chrono-text">${e.text}</div>
+      <button type="button" class="chrono-del" data-id="${e.id}" title="Supprimer">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.chrono-del').forEach(b => {
+    b.addEventListener('click', () => {
+      chronoEntries = chronoEntries.filter(e => e.id !== b.dataset.id);
+      renderChrono();
+    });
+  });
+}
+
+document.getElementById('c-add').addEventListener('click', () => {
+  const minEl = document.getElementById('c-min');
+  const textEl = document.getElementById('c-text');
+  const typeEl = document.getElementById('c-type');
+  const min = minEl.value;
+  const text = textEl.value.trim();
+  if(min === '' || text === ''){
+    (min === '' ? minEl : textEl).focus();
+    return;
+  }
+  chronoEntries.push({ id: Date.now().toString(), min: parseInt(min,10), type: typeEl.value, text });
+  minEl.value = '';
+  textEl.value = '';
+  minEl.focus();
+  renderChrono();
+  autoSaveIfFolderChosen();
+});
+
+document.getElementById('c-text').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('c-add').click(); }
+});
+
+renderChrono();
+
+// --- Chronomètre de match ---
+const clockTimeEl = document.getElementById('clock-time');
+const clockStatusEl = document.getElementById('clock-status');
+const clockStoppageEl = document.getElementById('clock-stoppage');
+const clockButtonsEl = document.getElementById('clock-buttons');
+
+let phase = 'avant'; // avant | mt1 | pause | mt2 | fin
+let periodStartMs = null;   // début de la période en cours (Date.now())
+let periodBaseSec = 0;      // offset (45*60 pour la 2e mi-temps)
+let arretActive = false;
+let arretStartMs = null;
+let stoppageTotalSec = 0;
+let tickHandle = null;
+
+function fmt(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function currentMatchSeconds(){
+  if(periodStartMs === null) return periodBaseSec;
+  return periodBaseSec + Math.floor((Date.now() - periodStartMs)/1000);
+}
+
+// --- Notifications d'arrêt de jeu ---
+const clockLogEl = document.getElementById('clock-log');
+let stoppageNotifs = [];
+
+function renderClockLog(){
+  if(stoppageNotifs.length === 0){
+    clockLogEl.innerHTML = '<div class="clock-log-empty">Les arrêts de jeu apparaîtront ici.</div>';
+    return;
+  }
+  clockLogEl.innerHTML = stoppageNotifs.slice(0,8).map(n => `
+    <div class="clock-notif ${n.kind}">
+      <span>${n.icon} ${n.text}</span>
+      <span class="n-min">${n.min}'</span>
+    </div>
+  `).join('');
+}
+
+function pushNotif(kind, icon, text, min){
+  stoppageNotifs.unshift({ kind, icon, text, min });
+  renderClockLog();
+}
+
+function updateClockDisplay(){
+  clockTimeEl.textContent = fmt(currentMatchSeconds());
+  const stoppageNow = stoppageTotalSec + (arretActive ? Math.floor((Date.now()-arretStartMs)/1000) : 0);
+  clockStoppageEl.innerHTML = "Temps d'arrêt cumulé : <b>" + fmt(stoppageNow) + "</b>";
+}
+
+function startTicking(){
+  if(tickHandle) return;
+  tickHandle = setInterval(updateClockDisplay, 500);
+}
+function stopTicking(){
+  clearInterval(tickHandle);
+  tickHandle = null;
+}
+
+function renderClockButtons(){
+  let html = '';
+  if(phase === 'avant'){
+    html = `<button type="button" class="primary" id="btn-kickoff">Coup d'envoi</button>`;
+  } else if(phase === 'mt1'){
+    html = `<button type="button" class="arret${arretActive?' active':''}" id="btn-arret">${arretActive ? 'Reprise du jeu' : 'Arrêt de jeu'}</button>
+            <button type="button" id="btn-midtime">Mi-temps</button>`;
+  } else if(phase === 'pause'){
+    html = `<button type="button" class="primary" id="btn-kickoff2">Coup d'envoi 2ème mi-temps</button>`;
+  } else if(phase === 'mt2'){
+    html = `<button type="button" class="arret${arretActive?' active':''}" id="btn-arret">${arretActive ? 'Reprise du jeu' : 'Arrêt de jeu'}</button>
+            <button type="button" class="stop-btn" id="btn-fulltime">Fin du match</button>`;
+  } else if(phase === 'fin'){
+    html = `<button type="button" id="btn-reset">Réinitialiser</button>`;
+  }
+  clockButtonsEl.innerHTML = html;
+
+  const b = id => document.getElementById(id);
+  if(b('btn-kickoff')) b('btn-kickoff').addEventListener('click', () => {
+    phase = 'mt1'; periodBaseSec = 0; periodStartMs = Date.now();
+    clockStatusEl.textContent = '1ère mi-temps en cours';
+    startTicking(); renderClockButtons(); autoSaveIfFolderChosen();
+  });
+  if(b('btn-arret')) b('btn-arret').addEventListener('click', () => {
+    const min = Math.floor(currentMatchSeconds()/60);
+    if(!arretActive){
+      arretActive = true; arretStartMs = Date.now();
+      pushNotif('start', '⏸', 'Arrêt de jeu', min);
+    } else {
+      const dureeSec = Math.floor((Date.now()-arretStartMs)/1000);
+      stoppageTotalSec += dureeSec;
+      arretActive = false; arretStartMs = null;
+      pushNotif('stop', '▶', `Reprise du jeu (arrêt de ${fmt(dureeSec)})`, min);
+    }
+    renderClockButtons(); autoSaveIfFolderChosen();
+  });
+  if(b('btn-midtime')) b('btn-midtime').addEventListener('click', () => {
+    if(arretActive){ stoppageTotalSec += Math.floor((Date.now()-arretStartMs)/1000); arretActive = false; }
+    periodBaseSec = currentMatchSeconds(); periodStartMs = null;
+    phase = 'pause'; stopTicking();
+    clockStatusEl.textContent = 'Mi-temps';
+    updateClockDisplay(); renderClockButtons(); autoSaveIfFolderChosen();
+  });
+  if(b('btn-kickoff2')) b('btn-kickoff2').addEventListener('click', () => {
+    phase = 'mt2'; periodBaseSec = 45*60; periodStartMs = Date.now();
+    stoppageTotalSec = 0;
+    clockStatusEl.textContent = '2ème mi-temps en cours';
+    startTicking(); renderClockButtons(); autoSaveIfFolderChosen();
+  });
+  if(b('btn-fulltime')) b('btn-fulltime').addEventListener('click', () => {
+    if(arretActive){ stoppageTotalSec += Math.floor((Date.now()-arretStartMs)/1000); arretActive = false; }
+    periodBaseSec = currentMatchSeconds(); periodStartMs = null;
+    phase = 'fin'; stopTicking();
+    clockStatusEl.textContent = 'Match terminé';
+    updateClockDisplay(); renderClockButtons(); autoSaveIfFolderChosen();
+  });
+  if(b('btn-reset')) b('btn-reset').addEventListener('click', () => {
+    phase = 'avant'; periodBaseSec = 0; periodStartMs = null;
+    stoppageTotalSec = 0; arretActive = false; arretStartMs = null;
+    clockStatusEl.textContent = 'Avant-match';
+    stopTicking(); updateClockDisplay(); renderClockButtons();
+  });
+}
+
+renderClockButtons();
+updateClockDisplay();
+renderClockLog();
+
+// --- Cartons (avertissement automatique au 2e jaune) ---
+const cardsListEl = document.getElementById('cards-list');
+const cardsState = {}; // clé "Equipe-numero" -> { jaune: n, rouge: n }
+let cardEntries = [];
+
+function renderCards(){
+  cardsListEl.innerHTML = cardEntries.map(c => `
+    <div class="card-entry${c.urgent ? ' urgent' : ''}">
+      <span class="card-chip ${c.chipType}"></span>
+      <span>${c.text}</span>
+      <span class="c-min">${c.min}'</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('cd-add').addEventListener('click', () => {
+  const team = document.getElementById('cd-team').value;
+  const numEl = document.getElementById('cd-num');
+  const num = numEl.value;
+  const type = document.getElementById('cd-type').value;
+  if(num === ''){ numEl.focus(); return; }
+
+  const min = phase === 'avant' ? 0 : Math.floor(currentMatchSeconds()/60);
+  const key = team + '-' + num;
+  if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
+
+  if(type === 'jaune'){
+    cardsState[key].jaune++;
+    if(cardsState[key].jaune >= 2){
+      cardEntries.unshift({
+        chipType:'rouge', urgent:true, min,
+        text: `⚠️ 2e jaune — joueur n°${num} (${team}) → carton rouge obligatoire !`
+      });
+    } else {
+      cardEntries.unshift({ chipType:'jaune', urgent:false, min, text:`Carton jaune — joueur n°${num} (${team})` });
+    }
+  } else if(type === 'blanc'){
+    cardsState[key].blanc++;
+    if(cardsState[key].blanc >= 2){
+      cardEntries.unshift({
+        chipType:'rouge', urgent:true, min,
+        text: `⚠️ 2e carton blanc — joueur n°${num} (${team}) → carton rouge obligatoire !`
+      });
+    } else {
+      cardEntries.unshift({ chipType:'blanc', urgent:false, min, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` });
+    }
+  } else {
+    cardsState[key].rouge++;
+    cardEntries.unshift({ chipType:'rouge', urgent:false, min, text:`Carton rouge direct — joueur n°${num} (${team})` });
+  }
+  numEl.value = '';
+  numEl.focus();
+  renderCards();
+  autoSaveIfFolderChosen();
+});
+
+document.getElementById('cd-num').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('cd-add').click(); }
+});
+
+renderCards();
+
+// Reflète le nom des clubs dans le sélecteur de cartons
+function syncClubLabels(){
+  const dom = document.getElementById('f-club-dom').value.trim();
+  const ext = document.getElementById('f-club-ext').value.trim();
+  document.getElementById('opt-dom').textContent = dom || 'Domicile';
+  document.getElementById('opt-ext').textContent = ext || 'Extérieur';
+  if(typeof renderGoals === 'function') renderGoals();
+}
+document.getElementById('f-club-dom').addEventListener('input', syncClubLabels);
+document.getElementById('f-club-ext').addEventListener('input', syncClubLabels);
+
+// --- Buts ---
+const goalsListEl = document.getElementById('goals-list');
+const goalsScoreEl = document.getElementById('goals-score');
+const goalsChooserEl = document.getElementById('goals-chooser');
+let scoreDom = 0, scoreExt = 0;
+let goalEntries = [];
+
+function labelFor(team){
+  const dom = document.getElementById('f-club-dom').value.trim();
+  const ext = document.getElementById('f-club-ext').value.trim();
+  return team === 'Domicile' ? (dom || 'Domicile') : (ext || 'Extérieur');
+}
+
+function renderGoals(){
+  goalsScoreEl.innerHTML = `${labelFor('Domicile')} <span>${scoreDom}</span> — <span>${scoreExt}</span> ${labelFor('Extérieur')}`;
+  goalsListEl.innerHTML = goalEntries.map(g => `
+    <div class="goal-entry">
+      <span>⚽ But — ${labelFor(g.team)}</span>
+      <span class="g-min">${g.min}'</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('btn-but').addEventListener('click', () => {
+  document.getElementById('btn-but-dom').textContent = labelFor('Domicile');
+  document.getElementById('btn-but-ext').textContent = labelFor('Extérieur');
+  goalsChooserEl.classList.toggle('open');
+});
+
+function recordGoal(team){
+  const min = phase === 'avant' ? 0 : Math.floor(currentMatchSeconds()/60);
+  if(team === 'Domicile') scoreDom++; else scoreExt++;
+  goalEntries.unshift({ team, min });
+  goalsChooserEl.classList.remove('open');
+  renderGoals();
+  autoSaveIfFolderChosen();
+}
+document.getElementById('btn-but-dom').addEventListener('click', () => recordGoal('Domicile'));
+document.getElementById('btn-but-ext').addEventListener('click', () => recordGoal('Extérieur'));
+renderGoals();
+syncClubLabels();
+
+// --- Dossier d'enregistrement direct (OneDrive local synchronisé — ordinateur uniquement) ---
+let oneDriveDirHandle = null;
+const folderStatusEl = document.getElementById('folder-status');
+const pickFolderBtn = document.getElementById('btn-pick-folder');
+const exportBtn = document.getElementById('btn-export');
+const supportsFS = 'showDirectoryPicker' in window;
+
+let supportsShareFiles = false;
+try{
+  supportsShareFiles = !!(navigator.canShare && navigator.share &&
+    navigator.canShare({ files: [new File(['test'], 'test.html', { type: 'text/html' })] }));
+}catch(e){ supportsShareFiles = false; }
+
+if(supportsFS){
+  folderStatusEl.textContent = "Aucun dossier choisi — le fichier sera téléchargé normalement. Cliquez sur « Choisir mon dossier OneDrive » (une seule fois) pour un enregistrement direct sans téléchargement.";
+} else if(supportsShareFiles){
+  pickFolderBtn.style.display = 'none';
+  exportBtn.textContent = '📤 Enregistrer / Partager vers OneDrive';
+  folderStatusEl.textContent = "Sur mobile, l'enregistrement automatique et silencieux n'est pas possible. Appuyez sur le bouton à chaque fois que vous voulez sauvegarder : le menu de partage de votre téléphone s'ouvre, choisissez OneDrive dedans.";
+} else {
+  pickFolderBtn.style.display = 'none';
+  folderStatusEl.textContent = "Votre navigateur ne permet ni l'enregistrement direct ni le partage de fichier. Le bouton téléchargera le fichier — déposez-le ensuite vous-même dans OneDrive.";
+}
+
+document.getElementById('btn-pick-folder').addEventListener('click', async () => {
+  if(!supportsFS){
+    folderStatusEl.textContent = "Fonction non disponible sur ce navigateur — utilisez Chrome ou Edge sur ordinateur, ou téléchargez puis déposez le fichier vous-même dans OneDrive.";
+    return;
+  }
+  try{
+    oneDriveDirHandle = await window.showDirectoryPicker();
+    const perm = await oneDriveDirHandle.requestPermission({ mode: 'readwrite' });
+    if(perm === 'granted'){
+      folderStatusEl.textContent = `✅ Dossier sélectionné : « ${oneDriveDirHandle.name} ». Les prochains enregistrements iront directement dedans (rechoisir à chaque ouverture de la page).`;
+    } else {
+      oneDriveDirHandle = null;
+      folderStatusEl.textContent = "Autorisation refusée — le fichier sera téléchargé normalement.";
+    }
+  } catch(err){
+    // annulation par l'utilisateur : on ne change rien
+  }
+});
+
+async function saveMatchFile(filename, content, mime){
+  mime = mime || 'application/json';
+  if(oneDriveDirHandle){
+    try{
+      const fileHandle = await oneDriveDirHandle.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      folderStatusEl.textContent = `✅ Enregistré directement dans « ${oneDriveDirHandle.name} » : ${filename}`;
+      return true;
+    } catch(err){
+      folderStatusEl.textContent = "Échec de l'enregistrement direct — téléchargement classique utilisé à la place.";
+    }
+  }
+
+  if(!oneDriveDirHandle && supportsShareFiles){
+    try{
+      const file = new File([content], filename, { type: mime });
+      await navigator.share({ files: [file], title: filename, text: "Rapport d'observation d'arbitre assistant" });
+      folderStatusEl.textContent = `✅ Partagé — sélectionnez OneDrive dans le menu pour enregistrer « ${filename} ».`;
+      return true;
+    } catch(err){
+      // annulation du partage par l'utilisateur : pas d'erreur affichée
+      return false;
+    }
+  }
+
+  // repli : téléchargement classique
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return false;
+}
+
+function esc(s){
+  return (s || '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function buildMatchHTML(data){
+  let sectionsHTML = '';
+  const bySection = {};
+  data.criteres.forEach(c => {
+    (bySection[c.section] = bySection[c.section] || []).push(c);
+  });
+  Object.keys(bySection).forEach(sec => {
+    sectionsHTML += `<h3>${esc(sec)}</h3><table><tr><th>Critère</th><th>Évaluation</th><th>Commentaire</th></tr>`;
+    bySection[sec].forEach(c => {
+      sectionsHTML += `<tr><td>${esc(c.critere)}</td><td><b>${esc(c.evaluation || '—')}</b></td><td>${esc(c.commentaire || '')}</td></tr>`;
+    });
+    sectionsHTML += `</table>`;
+  });
+
+  const chronoHTML = data.chronologie_minute_par_minute.length
+    ? '<ul>' + data.chronologie_minute_par_minute.map(e => `<li><b>${e.minute}'</b> — [${esc(e.type)}] ${esc(e.texte)}</li>`).join('') + '</ul>'
+    : '<p><i>Aucune note.</i></p>';
+
+  const butsHTML = data.buts.length
+    ? '<ul>' + data.buts.map(g => `<li><b>${g.minute}'</b> — But ${esc(g.equipe)}</li>`).join('') + '</ul>'
+    : '<p><i>Aucun but.</i></p>';
+
+  const cartonsHTML = data.cartons.length
+    ? '<ul>' + data.cartons.map(c => `<li><b>${c.min}'</b> — ${esc(c.text)}</li>`).join('') + '</ul>'
+    : '<p><i>Aucun carton.</i></p>';
+
+  const note = data.note.manuelle !== null ? data.note.manuelle : data.note.automatique;
+
+  const indemnHTML = data.indemnites && data.indemnites.total !== null
+    ? `<p><b>Kilomètres (aller) :</b> ${data.indemnites.kilometres_aller} km &nbsp;|&nbsp; <b>Indemnité rapport :</b> ${data.indemnites.indemnite_rapport.toFixed(2)} € &nbsp;|&nbsp; <b>Indemnité déplacement :</b> ${data.indemnites.indemnite_deplacement.toFixed(2)} €</p>
+       <p style="font-size:1.3rem;font-weight:bold;color:#0a1f4d;">Total à toucher : ${data.indemnites.total.toFixed(2)} €</p>`
+    : '<p><i>Kilométrage non renseigné.</i></p>';
+
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>Rapport — ${esc(data.match.match)}</title>
+<style>
+body{font-family:Georgia,'Times New Roman',serif;max-width:800px;margin:30px auto;padding:0 20px;color:#1c2230;}
+h1{color:#0a1f4d;border-bottom:3px solid #0a1f4d;padding-bottom:8px;}
+h2{color:#0a1f4d;margin-top:32px;border-bottom:1px solid #dfdcd3;padding-bottom:4px;}
+h3{color:#5b6270;font-size:1rem;margin-top:20px;}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:.9rem;}
+td,th{border:1px solid #dfdcd3;padding:6px 8px;text-align:left;vertical-align:top;}
+th{background:#f6f5f1;}
+.meta p{margin:4px 0;}
+.note{font-size:2rem;font-weight:bold;color:#0a1f4d;}
+ul{padding-left:20px;}
+@media print{ body{margin:0;} }
+</style></head><body>
+<h1>Rapport d'Observateur — ${esc(data.type_observation)}</h1>
+<div class="meta">
+<p><b>Généré le :</b> ${new Date(data.genere_le).toLocaleString('fr-FR')}</p>
+<p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(data.match.date)}</p>
+<p><b>Arbitre assistant :</b> ${esc(data.match.arbitre_assistant)} &nbsp; | &nbsp; <b>Arbitre :</b> ${esc(data.match.arbitre)} &nbsp; | &nbsp; <b>Catégorie :</b> ${esc(data.match.categorie)}</p>
+<p><b>Observateur :</b> ${esc(data.match.observateur)}</p>
+<p><b>Domicile :</b> ${esc(data.match.club_domicile.nom)} (${esc(data.match.club_domicile.division)} / ${esc(data.match.club_domicile.poule)}) &nbsp;—&nbsp; <b>Extérieur :</b> ${esc(data.match.club_exterieur.nom)} (${esc(data.match.club_exterieur.division)} / ${esc(data.match.club_exterieur.poule)})</p>
+<p><b>Score final :</b> ${data.score.domicile} — ${data.score.exterieur}</p>
+</div>
+
+<h2>Note globale : <span class="note">${note !== null ? note : '—'} / 20</span></h2>
+<p><b>Bilan :</b> ${esc(data.bilan)}</p>
+
+<h2>Critères d'évaluation</h2>
+${sectionsHTML}
+
+<h2>Appréciation générale</h2>
+<p>${esc(data.appreciation_generale) || '<i>Non renseignée.</i>'}</p>
+<h2>Points forts</h2>
+<p>${esc(data.points_forts) || '<i>Non renseignés.</i>'}</p>
+<h2>Points d'amélioration</h2>
+<p>${esc(data.points_amelioration) || '<i>Non renseignés.</i>'}</p>
+
+<h2>Chronologie minute par minute</h2>
+${chronoHTML}
+
+<h2>Buts</h2>
+${butsHTML}
+
+<h2>Cartons</h2>
+${cartonsHTML}
+
+<h2>Indemnités</h2>
+${indemnHTML}
+
+</body></html>`;
+}
+
+// --- Export du match (fichier à déposer / faire déposer sur Google Drive) ---
+function buildMatchData(){
+  const val = id => document.getElementById(id).value;
+
+  const criteres = [];
+  DATA.forEach(section => {
+    section.items.forEach((label, i) => {
+      const name = section.key + '-' + i;
+      const checked = document.querySelector(`input[name="${name}"]:checked`);
+      const commentEl = document.querySelector(`textarea[data-crit="${name}"]`);
+      criteres.push({
+        section: section.title,
+        critere: label,
+        evaluation: checked ? checked.value : null,
+        commentaire: commentEl.value || null
+      });
+    });
+  });
+
+  const bilanEl = document.querySelector('input[name="bilan"]:checked');
+  const manual = val('f-notemanuelle');
+  let noteAuto = null, count = 0, sum = 0;
+  criteres.forEach(c => { if(c.evaluation){ sum += POINTS[c.evaluation]; count++; } });
+  if(count > 0) noteAuto = +(sum/count).toFixed(1);
+
+  return {
+    genere_le: new Date().toISOString(),
+    type_observation: observationType === 'central' ? 'Arbitre Central' : 'Arbitre Assistant',
+    match: {
+      competition: val('f-competition'),
+      match: val('f-match'),
+      arbitre_assistant: val('f-aa'),
+      categorie: val('f-cat'),
+      arbitre: val('f-arbitre'),
+      observateur: val('f-observateur') || val('f-observateur2'),
+      date: val('f-date'),
+      club_domicile: { nom: val('f-club-dom'), division: val('f-div-dom'), poule: val('f-poule-dom') },
+      club_exterieur: { nom: val('f-club-ext'), division: val('f-div-ext'), poule: val('f-poule-ext') }
+    },
+    criteres,
+    note: { automatique: noteAuto, manuelle: manual !== '' ? parseFloat(manual) : null },
+    bilan: bilanEl ? bilanEl.value : null,
+    appreciation_generale: val('f-appreciation'),
+    points_forts: val('f-forts'),
+    points_amelioration: val('f-ameliorer'),
+    chronologie_minute_par_minute: chronoEntries.sort((a,b)=>a.min-b.min).map(e => ({ minute:e.min, type: TAG_LABEL[e.type], texte:e.text })),
+    score: { domicile: scoreDom, exterieur: scoreExt },
+    buts: goalEntries.slice().reverse().map(g => ({ minute: g.min, equipe: labelFor(g.team) })),
+    arrets_de_jeu: stoppageNotifs.slice().reverse(),
+    cartons: cardEntries.slice().reverse(),
+    temps_arret_cumule_secondes: stoppageTotalSec,
+    indemnites: (() => {
+      const i = computeIndemnites();
+      return {
+        kilometres_aller: i.km,
+        indemnite_rapport: RAPPORT_INDEMN,
+        indemnite_deplacement: i.deplacement,
+        total: i.total
+      };
+    })()
+  };
+}
+
+function getMatchFilename(){
+  const val = id => document.getElementById(id).value;
+  const nomArbitre = (val('f-aa') || 'arbitre').replace(/[^a-z0-9]+/gi, '_');
+  const nomMatch = (val('f-match') || 'match').replace(/[^a-z0-9]+/gi, '_');
+  const dateStr = (val('f-date') || new Date().toISOString().slice(0,10));
+  return `Rapport_${nomArbitre}_${nomMatch}_${dateStr}.html`;
+}
+
+document.getElementById('btn-export').addEventListener('click', async () => {
+  await saveMatchFile(getMatchFilename(), buildMatchHTML(buildMatchData()), 'text/html');
+});
+
+// --- Enregistrement automatique dans le dossier OneDrive choisi ---
+let autoSaveTimer = null;
+function autoSaveIfFolderChosen(){
+  if(!oneDriveDirHandle) return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    try{
+      const fileHandle = await oneDriveDirHandle.getFileHandle(getMatchFilename(), { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(buildMatchHTML(buildMatchData()));
+      await writable.close();
+      const t = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      folderStatusEl.textContent = `✅ Enregistrement automatique dans « ${oneDriveDirHandle.name} » — dernière sauvegarde à ${t}`;
+    } catch(err){
+      folderStatusEl.textContent = "Échec de l'enregistrement automatique — pensez à cliquer sur « Enregistrer le match ».";
+    }
+  }, 800);
+}
+</script>
+</body>
+</html>
