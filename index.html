@@ -846,6 +846,14 @@
       </div>
       <div id="folder-status" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);margin-top:8px;">Aucun dossier choisi — le fichier sera téléchargé normalement. Cliquez sur « Choisir mon dossier OneDrive » (une seule fois) pour un enregistrement direct sans téléchargement.</div>
     </div>
+    <div class="field" style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
+      <label style="font-size:.68rem;color:var(--ink-soft);">Reprendre un rapport déjà enregistré</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button type="button" id="btn-import" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.5px;text-transform:uppercase;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:6px;padding:11px 18px;cursor:pointer;">📂 Importer un rapport</button>
+        <input type="file" id="input-import" accept=".html" style="display:none;">
+      </div>
+      <div id="import-status" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);margin-top:8px;">Sélectionnez un fichier de rapport déjà enregistré (.html) pour recharger toutes ses données ici et continuer à le remplir.</div>
+    </div>
   </div>
 
   </div><!-- /tabpanel-rapport -->
@@ -1697,6 +1705,7 @@ ${cartonsHTML}
 <h2>Indemnités</h2>
 ${indemnHTML}
 
+<script type="application/json" id="match-data">${JSON.stringify(data).replace(/</g,'\\u003c')}<\/script>
 </body></html>`;
 }
 
@@ -1774,6 +1783,142 @@ function getMatchFilename(){
 document.getElementById('btn-export').addEventListener('click', async () => {
   await saveMatchFile(getMatchFilename(), buildMatchHTML(buildMatchData()), 'text/html');
 });
+
+// --- Importer un rapport déjà enregistré (reprendre là où on s'était arrêté) ---
+const importStatusEl = document.getElementById('import-status');
+document.getElementById('btn-import').addEventListener('click', () => {
+  document.getElementById('input-import').click();
+});
+
+document.getElementById('input-import').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const html = reader.result;
+      const match = html.match(/<script type="application\/json" id="match-data">([\s\S]*?)<\/script>/);
+      if(!match){
+        importStatusEl.textContent = "Ce fichier ne contient pas de données réimportables (rapport trop ancien ou fichier différent).";
+        return;
+      }
+      const data = JSON.parse(match[1]);
+      loadMatchData(data);
+      importStatusEl.textContent = `✅ Rapport « ${data.match.match || 'sans nom'} » rechargé — vous pouvez continuer à le remplir.`;
+    } catch(err){
+      importStatusEl.textContent = "Échec de la lecture du fichier : " + err.message;
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+function loadMatchData(data){
+  const setVal = (id, v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
+
+  // Métadonnées du match
+  setVal('f-competition', data.match.competition);
+  setVal('f-match', data.match.match);
+  setVal('f-aa', data.match.arbitre_assistant);
+  setVal('f-cat', data.match.categorie);
+  setVal('f-arbitre', data.match.arbitre);
+  setVal('f-observateur', data.match.observateur);
+  setVal('f-observateur2', data.match.observateur);
+  setVal('f-date', data.match.date);
+  if(data.match.club_domicile){
+    setVal('f-club-dom', data.match.club_domicile.nom);
+    setVal('f-div-dom', data.match.club_domicile.division);
+    setVal('f-poule-dom', data.match.club_domicile.poule);
+  }
+  if(data.match.club_exterieur){
+    setVal('f-club-ext', data.match.club_exterieur.nom);
+    setVal('f-div-ext', data.match.club_exterieur.division);
+    setVal('f-poule-ext', data.match.club_exterieur.poule);
+  }
+
+  // Type d'observation + critères (bascule le type sans demander confirmation)
+  const wantedType = data.type_observation === 'Arbitre Central' ? 'central' : 'assistant';
+  observationType = wantedType;
+  DATA = (wantedType === 'central') ? DATA_CENTRAL : DATA_ASSISTANT;
+  document.getElementById('type-assistant').classList.toggle('active', wantedType === 'assistant');
+  document.getElementById('type-central').classList.toggle('active', wantedType === 'central');
+  renderSections();
+
+  if(Array.isArray(data.criteres)){
+    let idx = 0;
+    DATA.forEach(section => {
+      section.items.forEach((label, i) => {
+        const c = data.criteres[idx];
+        idx++;
+        if(!c) return;
+        const name = section.key + '-' + i;
+        if(c.evaluation){
+          const radio = document.querySelector(`input[name="${name}"][value="${c.evaluation}"]`);
+          if(radio) radio.checked = true;
+        }
+        const commentEl = document.querySelector(`textarea[data-crit="${name}"]`);
+        if(commentEl && c.commentaire) commentEl.value = c.commentaire;
+      });
+    });
+  }
+
+  setVal('f-notemanuelle', data.note && data.note.manuelle !== null ? data.note.manuelle : '');
+  if(data.bilan){
+    const bilanRadio = document.querySelector(`input[name="bilan"][value="${data.bilan}"]`);
+    if(bilanRadio) bilanRadio.checked = true;
+  }
+  setVal('f-appreciation', data.appreciation_generale);
+  setVal('f-forts', data.points_forts);
+  setVal('f-ameliorer', data.points_amelioration);
+
+  // Chronologie
+  chronoEntries = (data.chronologie_minute_par_minute || []).map(e => ({
+    id: Date.now().toString() + Math.random(),
+    min: e.minute,
+    type: Object.keys(TAG_LABEL).find(k => TAG_LABEL[k] === e.type) || 'neutre',
+    text: e.texte
+  }));
+
+  // Buts et score
+  scoreDom = data.score ? data.score.domicile || 0 : 0;
+  scoreExt = data.score ? data.score.exterieur || 0 : 0;
+  goalEntries = (data.buts || []).slice().reverse().map(g => ({
+    team: g.equipe === (data.match.club_domicile && data.match.club_domicile.nom) ? 'Domicile' : (g.equipe === 'Domicile' || g.equipe === 'Extérieur' ? g.equipe : 'Domicile'),
+    min: g.minute
+  }));
+
+  // Cartons
+  cardEntries = (data.cartons || []).slice().reverse();
+  Object.keys(cardsState).forEach(k => delete cardsState[k]);
+  // reconstruit les compteurs par joueur à partir du texte des cartons (best-effort)
+  (data.cartons || []).forEach(c => {
+    const mJaune = c.text && c.text.match(/joueur n°(\d+) \((.+?)\)/);
+    if(mJaune){
+      const key = mJaune[2] + '-' + mJaune[1];
+      if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
+      if(c.chipType === 'jaune') cardsState[key].jaune++;
+      else if(c.chipType === 'blanc') cardsState[key].blanc++;
+      else if(c.chipType === 'rouge') cardsState[key].rouge++;
+    }
+  });
+
+  // Arrêts de jeu et temps cumulé
+  stoppageNotifs = (data.arrets_de_jeu || []).slice().reverse();
+  stoppageTotalSec = data.temps_arret_cumule_secondes || 0;
+
+  // Kilomètres / indemnités
+  setVal('f-km', data.indemnites ? data.indemnites.kilometres_aller : '');
+
+  // Rafraîchit tous les affichages
+  syncClubLabels();
+  renderChrono();
+  renderCards();
+  renderGoals();
+  computeScore();
+  computeIndemnites();
+  updateBaremeHint();
+  renderClockLog();
+}
 
 // --- Enregistrement automatique (OneDrive connecté ou dossier local choisi) ---
 let autoSaveTimer = null;
