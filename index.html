@@ -742,26 +742,15 @@
 
   <div class="meta">
     <div class="field"><label>Compétition</label><input type="text" id="f-competition"></div>
-    <div class="field"><label>Match</label><input type="text" id="f-match"></div>
-    <div class="field"><label>Arbitre Assistant</label><input type="text" id="f-aa"></div>
-    <div class="field"><label>Catégorie</label><input type="text" id="f-cat"></div>
+    <div class="field"><label>Match</label><input type="text" id="f-match" placeholder="ex : DOLOMIEU US 2 / FC LAUZES 2"></div>
     <div class="field"><label>Arbitre</label><input type="text" id="f-arbitre"></div>
+    <div class="field"><label>Catégorie</label><input type="text" id="f-cat"></div>
+    <div class="field"><label>Arbitre Assistant 1</label><input type="text" id="f-aa1"></div>
     <div class="field"><label>Observateur</label><input type="text" id="f-observateur"></div>
-    <div class="field"></div>
+    <div class="field"><label>Arbitre Assistant 2</label><input type="text" id="f-aa2"></div>
     <div class="field"><label>Club Domicile</label><input type="text" id="f-club-dom"></div>
-    <div class="field"><label>Division / Poule (Domicile)</label>
-      <div style="display:flex;gap:10px;">
-        <input type="text" id="f-div-dom" placeholder="Division">
-        <input type="text" id="f-poule-dom" placeholder="Poule">
-      </div>
-    </div>
+    <div class="field"><label>Date</label><input type="date" id="f-date"></div>
     <div class="field"><label>Club Extérieur</label><input type="text" id="f-club-ext"></div>
-    <div class="field"><label>Division / Poule (Extérieur)</label>
-      <div style="display:flex;gap:10px;">
-        <input type="text" id="f-div-ext" placeholder="Division">
-        <input type="text" id="f-poule-ext" placeholder="Poule">
-      </div>
-    </div>
   </div>
 
   <div class="legend">
@@ -831,7 +820,7 @@
 
   <div class="footer">
     <div class="field"><label>Observateur</label><input type="text" id="f-observateur2" placeholder="signature / nom"></div>
-    <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+    <div class="field"></div>
     <div class="field" style="grid-column:1/-1;background:#eef0f5;border-radius:8px;padding:14px 16px;">
       <label>&nbsp;</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
@@ -1864,9 +1853,10 @@ ul{padding-left:20px;}
 <div class="meta">
 <p><b>Généré le :</b> ${new Date(data.genere_le).toLocaleString('fr-FR')}</p>
 <p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(data.match.date)}</p>
-<p><b>Arbitre assistant :</b> ${esc(data.match.arbitre_assistant)} &nbsp; | &nbsp; <b>Arbitre :</b> ${esc(data.match.arbitre)} &nbsp; | &nbsp; <b>Catégorie :</b> ${esc(data.match.categorie)}</p>
+<p><b>Arbitre :</b> ${esc(data.match.arbitre)} &nbsp; | &nbsp; <b>Catégorie :</b> ${esc(data.match.categorie)}</p>
+<p><b>Arbitre assistant 1 :</b> ${esc(data.match.arbitre_assistant_1)} &nbsp; | &nbsp; <b>Arbitre assistant 2 :</b> ${esc(data.match.arbitre_assistant_2)}</p>
 <p><b>Observateur :</b> ${esc(data.match.observateur)}</p>
-<p><b>Domicile :</b> ${esc(data.match.club_domicile.nom)} (${esc(data.match.club_domicile.division)} / ${esc(data.match.club_domicile.poule)}) &nbsp;—&nbsp; <b>Extérieur :</b> ${esc(data.match.club_exterieur.nom)} (${esc(data.match.club_exterieur.division)} / ${esc(data.match.club_exterieur.poule)})</p>
+<p><b>Domicile :</b> ${esc(data.match.club_domicile.nom)} &nbsp;—&nbsp; <b>Extérieur :</b> ${esc(data.match.club_exterieur.nom)}</p>
 <p><b>Score final :</b> ${data.score.domicile} — ${data.score.exterieur}</p>
 </div>
 
@@ -1930,13 +1920,14 @@ function buildMatchData(){
     match: {
       competition: val('f-competition'),
       match: val('f-match'),
-      arbitre_assistant: val('f-aa'),
+      arbitre_assistant_1: val('f-aa1'),
+      arbitre_assistant_2: val('f-aa2'),
       categorie: val('f-cat'),
       arbitre: val('f-arbitre'),
       observateur: val('f-observateur') || val('f-observateur2'),
       date: val('f-date'),
-      club_domicile: { nom: val('f-club-dom'), division: val('f-div-dom'), poule: val('f-poule-dom') },
-      club_exterieur: { nom: val('f-club-ext'), division: val('f-div-ext'), poule: val('f-poule-ext') }
+      club_domicile: { nom: val('f-club-dom') },
+      club_exterieur: { nom: val('f-club-ext') }
     },
     criteres,
     note: { automatique: noteAuto, manuelle: manual !== '' ? parseFloat(manual) : null },
@@ -1964,7 +1955,7 @@ function buildMatchData(){
 
 function getMatchFilename(){
   const val = id => document.getElementById(id).value;
-  const nomArbitre = (val('f-aa') || 'arbitre').replace(/[^a-z0-9]+/gi, '_');
+  const nomArbitre = (val('f-arbitre') || 'arbitre').replace(/[^a-z0-9]+/gi, '_');
   const nomMatch = (val('f-match') || 'match').replace(/[^a-z0-9]+/gi, '_');
   const dateStr = (val('f-date') || new Date().toISOString().slice(0,10));
   return `Rapport_${nomArbitre}_${nomMatch}_${dateStr}.html`;
@@ -2127,7 +2118,8 @@ function loadMatchData(data){
   // Métadonnées du match
   setVal('f-competition', data.match.competition);
   setVal('f-match', data.match.match);
-  setVal('f-aa', data.match.arbitre_assistant);
+  setVal('f-aa1', data.match.arbitre_assistant_1 !== undefined ? data.match.arbitre_assistant_1 : data.match.arbitre_assistant);
+  setVal('f-aa2', data.match.arbitre_assistant_2);
   setVal('f-cat', data.match.categorie);
   setVal('f-arbitre', data.match.arbitre);
   setVal('f-observateur', data.match.observateur);
@@ -2135,13 +2127,9 @@ function loadMatchData(data){
   setVal('f-date', data.match.date);
   if(data.match.club_domicile){
     setVal('f-club-dom', data.match.club_domicile.nom);
-    setVal('f-div-dom', data.match.club_domicile.division);
-    setVal('f-poule-dom', data.match.club_domicile.poule);
   }
   if(data.match.club_exterieur){
     setVal('f-club-ext', data.match.club_exterieur.nom);
-    setVal('f-div-ext', data.match.club_exterieur.division);
-    setVal('f-poule-ext', data.match.club_exterieur.poule);
   }
 
   // Type d'observation + critères (bascule le type sans demander confirmation)
