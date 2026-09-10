@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Observation Arbitre">
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
   :root{
     --navy:#0a1f4d;
@@ -835,8 +836,10 @@
       <label>&nbsp;</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <button type="button" id="btn-onedrive-connect" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.5px;text-transform:uppercase;background:var(--navy);color:#fff;border:none;border-radius:6px;padding:12px 20px;cursor:pointer;">🔗 Se connecter à OneDrive</button>
+        <button type="button" id="btn-google-connect" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.5px;text-transform:uppercase;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:6px;padding:10px 20px;cursor:pointer;">🔗 Se connecter à Google Drive</button>
       </div>
       <div id="onedrive-status" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);margin-top:8px;">Non connecté — connectez-vous une fois pour un enregistrement 100% automatique dans « Observation arbitre », sur ordinateur comme sur mobile.</div>
+      <div id="google-status" style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:.72rem;color:var(--ink-soft);margin-top:4px;">Alternative si vous utilisez un compte Google plutôt que Microsoft.</div>
     </div>
     <div class="field" style="grid-column:1/-1;">
       <label style="font-size:.68rem;color:var(--ink-soft);">Autres méthodes (si vous ne voulez pas vous connecter à OneDrive)</label>
@@ -1527,6 +1530,182 @@ async function saveToOneDriveGraph(filename, content, mime){
   return true;
 }
 
+// --- Connexion Google Drive (alternative pour comptes Google) ---
+const GOOGLE_CLIENT_ID = '32361767404-m18i0bnpctiqp9m3tlv59b2ijcmpa1i4.apps.googleusercontent.com';
+const GOOGLE_FOLDER_NAME = ONEDRIVE_FOLDER; // même nom de dossier : « Observation arbitre »
+const googleStatusEl = document.getElementById('google-status');
+const googleConnectBtn = document.getElementById('btn-google-connect');
+let googleTokenClient = null;
+let googleAccessToken = null;
+let googleTokenExpiry = 0; // timestamp (ms) au-delà duquel le jeton est considéré expiré
+let googleFolderId = null;
+
+function initGoogle(){
+  if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2){
+    googleStatusEl.textContent = "La bibliothèque de connexion Google n'a pas pu se charger (vérifiez votre connexion Internet).";
+    return;
+  }
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (response) => {
+      if(response.error){
+        googleStatusEl.textContent = "Connexion Google échouée : " + response.error;
+        return;
+      }
+      googleAccessToken = response.access_token;
+      googleTokenExpiry = Date.now() + (parseInt(response.expires_in || '3600', 10) * 1000) - 120000; // marge de 2 min
+      updateGoogleStatus();
+    }
+  });
+}
+initGoogle();
+
+// Renvoie un jeton Google toujours valide, en le renouvelant silencieusement (sans fenêtre) si besoin.
+async function getGoogleToken(){
+  if(googleAccessToken && Date.now() < googleTokenExpiry){
+    return googleAccessToken;
+  }
+  return new Promise((resolve, reject) => {
+    if(!googleTokenClient){ reject(new Error('Connexion Google non initialisée')); return; }
+    googleTokenClient.callback = (response) => {
+      if(response.error){
+        googleStatusEl.textContent = "Session Google expirée — reconnectez-vous manuellement (bouton ci-dessus).";
+        googleAccessToken = null;
+        updateGoogleStatus();
+        reject(new Error(response.error));
+        return;
+      }
+      googleAccessToken = response.access_token;
+      googleTokenExpiry = Date.now() + (parseInt(response.expires_in || '3600', 10) * 1000) - 120000;
+      updateGoogleStatus();
+      resolve(googleAccessToken);
+    };
+    googleTokenClient.requestAccessToken({ prompt: '' }); // '' = tente un renouvellement silencieux (sans fenêtre) si la session Google est encore active
+  });
+}
+
+function updateGoogleStatus(){
+  if(googleAccessToken){
+    googleConnectBtn.textContent = '✅ Connecté à Google Drive — Se déconnecter';
+    googleStatusEl.textContent = `Enregistrement automatique actif dans le dossier « ${GOOGLE_FOLDER_NAME} » de votre Google Drive (renouvellement automatique).`;
+  } else {
+    googleConnectBtn.textContent = '🔗 Se connecter à Google Drive';
+    googleStatusEl.textContent = 'Alternative si vous utilisez un compte Google plutôt que Microsoft.';
+  }
+}
+
+googleConnectBtn.addEventListener('click', () => {
+  if(googleAccessToken){
+    if(typeof google !== 'undefined' && google.accounts && google.accounts.oauth2){
+      google.accounts.oauth2.revoke(googleAccessToken, () => {});
+    }
+    googleAccessToken = null;
+    googleTokenExpiry = 0;
+    googleFolderId = null;
+    updateGoogleStatus();
+    return;
+  }
+  if(!googleTokenClient){
+    googleStatusEl.textContent = "Connexion Google indisponible.";
+    return;
+  }
+  googleTokenClient.callback = (response) => {
+    if(response.error){
+      googleStatusEl.textContent = "Connexion Google échouée : " + response.error;
+      return;
+    }
+    googleAccessToken = response.access_token;
+    googleTokenExpiry = Date.now() + (parseInt(response.expires_in || '3600', 10) * 1000) - 120000;
+    updateGoogleStatus();
+  };
+  googleTokenClient.requestAccessToken({ prompt: 'consent' });
+});
+
+async function getGoogleFolderId(){
+  if(googleFolderId) return googleFolderId;
+  const token = await getGoogleToken();
+  const q = `mimeType='application/vnd.google-apps.folder' and name='${GOOGLE_FOLDER_NAME}' and trashed=false`;
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const json = await resp.json();
+  if(json.files && json.files.length > 0){
+    googleFolderId = json.files[0].id;
+    return googleFolderId;
+  }
+  const createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: GOOGLE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  const createJson = await createResp.json();
+  googleFolderId = createJson.id;
+  return googleFolderId;
+}
+
+async function findGoogleFileId(filename, folderId){
+  const token = await getGoogleToken();
+  const q = `name='${filename.replace(/'/g,"\\'")}' and '${folderId}' in parents and trashed=false`;
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const json = await resp.json();
+  return (json.files && json.files.length > 0) ? json.files[0].id : null;
+}
+
+async function saveToGoogleDrive(filename, content, mime){
+  const token = await getGoogleToken();
+  const folderId = await getGoogleFolderId();
+  const existingId = await findGoogleFileId(filename, folderId);
+
+  if(existingId){
+    const resp = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': mime },
+      body: content
+    });
+    if(!resp.ok) throw new Error('Échec mise à jour Google Drive (HTTP ' + resp.status + ')');
+  } else {
+    const boundary = 'obsarbitre_boundary_314159265';
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const closeDelim = "\r\n--" + boundary + "--";
+    const metadata = { name: filename, parents: [folderId] };
+    const multipartBody =
+      delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) +
+      delimiter + 'Content-Type: ' + mime + '\r\n\r\n' + content +
+      closeDelim;
+    const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
+      body: multipartBody
+    });
+    if(!resp.ok) throw new Error('Échec création Google Drive (HTTP ' + resp.status + ')');
+  }
+  return true;
+}
+
+async function listGoogleReports(){
+  const token = await getGoogleToken();
+  const folderId = await getGoogleFolderId();
+  const q = `'${folderId}' in parents and trashed=false and name contains '.html'`;
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const json = await resp.json();
+  return json.files || [];
+}
+
+async function loadGoogleFileContent(fileId){
+  const token = await getGoogleToken();
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  return await resp.text();
+}
+
 // --- Dossier d'enregistrement direct (OneDrive local synchronisé — ordinateur uniquement) ---
 let oneDriveDirHandle = null;
 const folderStatusEl = document.getElementById('folder-status');
@@ -1581,6 +1760,16 @@ async function saveMatchFile(filename, content, mime){
     } catch(err){
       onedriveStatusEl.textContent = "Échec de l'enregistrement OneDrive — méthode de secours utilisée : " + err.message;
       // on continue vers les méthodes de secours ci-dessous
+    }
+  }
+
+  if(googleAccessToken){
+    try{
+      await saveToGoogleDrive(filename, content, mime);
+      googleStatusEl.textContent = `✅ Enregistré dans Google Drive > ${GOOGLE_FOLDER_NAME} : ${filename}`;
+      return true;
+    } catch(err){
+      googleStatusEl.textContent = "Échec de l'enregistrement Google Drive — méthode de secours utilisée : " + err.message;
     }
   }
 
@@ -1792,10 +1981,57 @@ const onedriveFileListEl = document.getElementById('onedrive-file-list');
 document.getElementById('btn-import').addEventListener('click', () => {
   if(msalAccount){
     listOneDriveReports();
+  } else if(googleAccessToken){
+    listGoogleReportsUI();
   } else {
     document.getElementById('input-import').click();
   }
 });
+
+async function listGoogleReportsUI(){
+  onedriveFileListEl.innerHTML = '';
+  importStatusEl.textContent = "Recherche des rapports dans Google Drive > " + GOOGLE_FOLDER_NAME + "…";
+  try{
+    const files = await listGoogleReports();
+    if(files.length === 0){
+      importStatusEl.textContent = "Aucun rapport trouvé dans Google Drive > " + GOOGLE_FOLDER_NAME + ". Vous pouvez importer un fichier local à la place.";
+      renderLocalImportFallback();
+      return;
+    }
+    importStatusEl.textContent = `${files.length} rapport(s) trouvé(s) — choisissez-en un :`;
+    onedriveFileListEl.innerHTML = files.slice(0, 25).map(f => {
+      const d = new Date(f.modifiedTime).toLocaleString('fr-FR', { dateStyle:'short', timeStyle:'short' });
+      return `<button type="button" class="google-file-btn" data-id="${f.id}" data-name="${esc(f.name)}"
+        style="text-align:left;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.85rem;background:#fff;border:1px solid var(--line);border-radius:6px;padding:9px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;">
+        <span>${esc(f.name)}</span><span style="color:var(--ink-soft);font-size:.72rem;white-space:nowrap;">${d}</span>
+      </button>`;
+    }).join('');
+    onedriveFileListEl.querySelectorAll('.google-file-btn').forEach(btn => {
+      btn.addEventListener('click', () => loadGoogleReport(btn.dataset.id, btn.dataset.name));
+    });
+  } catch(err){
+    importStatusEl.textContent = "Impossible de lister les rapports Google Drive (" + err.message + "). Vous pouvez importer un fichier local à la place.";
+    renderLocalImportFallback();
+  }
+}
+
+async function loadGoogleReport(fileId, fileName){
+  importStatusEl.textContent = "Chargement de « " + fileName + " »…";
+  try{
+    const html = await loadGoogleFileContent(fileId);
+    const match = html.match(/<script type="application\/json" id="match-data">([\s\S]*?)<\/script>/);
+    if(!match){
+      importStatusEl.textContent = "Ce fichier ne contient pas de données réimportables (rapport trop ancien).";
+      return;
+    }
+    const data = JSON.parse(match[1]);
+    loadMatchData(data);
+    onedriveFileListEl.innerHTML = '';
+    importStatusEl.textContent = `✅ Rapport « ${data.match.match || fileName} » rechargé depuis Google Drive — vous pouvez continuer à le remplir.`;
+  } catch(err){
+    importStatusEl.textContent = "Échec du chargement depuis Google Drive : " + err.message;
+  }
+}
 
 async function listOneDriveReports(){
   onedriveFileListEl.innerHTML = '';
@@ -1992,10 +2228,10 @@ function loadMatchData(data){
   renderClockLog();
 }
 
-// --- Enregistrement automatique (OneDrive connecté ou dossier local choisi) ---
+// --- Enregistrement automatique (OneDrive/Google connecté ou dossier local choisi) ---
 let autoSaveTimer = null;
 function autoSaveIfFolderChosen(){
-  if(!oneDriveDirHandle && !msalAccount) return;
+  if(!oneDriveDirHandle && !msalAccount && !googleAccessToken) return;
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(async () => {
     const filename = getMatchFilename();
@@ -2009,6 +2245,16 @@ function autoSaveIfFolderChosen(){
         return;
       } catch(err){
         onedriveStatusEl.textContent = "Échec de l'enregistrement automatique OneDrive : " + err.message;
+      }
+    }
+
+    if(googleAccessToken){
+      try{
+        await saveToGoogleDrive(filename, html, 'text/html');
+        googleStatusEl.textContent = `✅ Enregistrement automatique dans Google Drive > ${GOOGLE_FOLDER_NAME} — dernière sauvegarde à ${t}`;
+        return;
+      } catch(err){
+        googleStatusEl.textContent = "Échec de l'enregistrement automatique Google Drive : " + err.message;
       }
     }
 
