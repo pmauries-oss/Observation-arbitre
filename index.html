@@ -1384,6 +1384,7 @@ function syncClubLabels(){
   const ext = document.getElementById('f-club-ext').value.trim();
   document.getElementById('opt-dom').textContent = dom || 'Domicile';
   document.getElementById('opt-ext').textContent = ext || 'Extérieur';
+  document.getElementById('f-match').value = [dom, ext].filter(Boolean).join(' / ');
   if(typeof renderGoals === 'function') renderGoals();
 }
 document.getElementById('f-club-dom').addEventListener('input', syncClubLabels);
