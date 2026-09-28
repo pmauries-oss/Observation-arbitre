@@ -751,6 +751,12 @@
     <div class="field"><label>Club Domicile</label><input type="text" id="f-club-dom"></div>
     <div class="field"><label>Date</label><input type="date" id="f-date"></div>
     <div class="field"><label>Club Extérieur</label><input type="text" id="f-club-ext"></div>
+    <div class="field"><label>Durée du match</label>
+      <select id="f-duree" style="font-family:inherit;font-size:.95rem;padding:7px 4px;border:none;border-bottom:1.5px solid var(--line);background:transparent;color:var(--ink);">
+        <option value="90" selected>90 minutes (2 × 45)</option>
+        <option value="80">80 minutes (2 × 40)</option>
+      </select>
+    </div>
   </div>
 
   <div class="legend">
@@ -858,6 +864,7 @@
         <div>
           <div class="clock-time" id="clock-time">00:00</div>
           <div class="clock-status" id="clock-status">Avant-match</div>
+          <div class="clock-stoppage" id="clock-duration"></div>
           <div class="clock-stoppage" id="clock-stoppage">Temps d'arrêt cumulé : <b>0:00</b></div>
         </div>
         <div class="clock-buttons" id="clock-buttons"></div>
@@ -1187,6 +1194,23 @@ document.getElementById('c-text').addEventListener('keydown', (e) => {
 
 renderChrono();
 
+// --- Durée du match (80 ou 90 minutes) ---
+function matchDuration(){
+  return parseInt(document.getElementById('f-duree').value, 10) === 80 ? 80 : 90;
+}
+function updateDurationInfo(){
+  const d = matchDuration();
+  const half = d / 2;
+  const el = document.getElementById('clock-duration');
+  if(el) el.innerHTML = `Match de <b>${d} min</b> (2 × ${half}) — mi-temps à ${half}' · fin à ${d}'`;
+  const minInput = document.getElementById('c-min');
+  if(minInput) minInput.max = d + 30;
+}
+document.getElementById('f-duree').addEventListener('change', () => {
+  updateDurationInfo();
+  autoSaveIfFolderChosen();
+});
+
 // --- Chronomètre de match ---
 const clockTimeEl = document.getElementById('clock-time');
 const clockStatusEl = document.getElementById('clock-status');
@@ -1195,7 +1219,7 @@ const clockButtonsEl = document.getElementById('clock-buttons');
 
 let phase = 'avant'; // avant | mt1 | pause | mt2 | fin
 let periodStartMs = null;   // début de la période en cours (Date.now())
-let periodBaseSec = 0;      // offset (45*60 pour la 2e mi-temps)
+let periodBaseSec = 0;      // offset (moitié de la durée du match pour la 2e mi-temps)
 let arretActive = false;
 let arretStartMs = null;
 let stoppageTotalSec = 0;
@@ -1293,7 +1317,7 @@ function renderClockButtons(){
     updateClockDisplay(); renderClockButtons(); autoSaveIfFolderChosen();
   });
   if(b('btn-kickoff2')) b('btn-kickoff2').addEventListener('click', () => {
-    phase = 'mt2'; periodBaseSec = 45*60; periodStartMs = Date.now();
+    phase = 'mt2'; periodBaseSec = (matchDuration()/2)*60; periodStartMs = Date.now();
     stoppageTotalSec = 0;
     clockStatusEl.textContent = '2ème mi-temps en cours';
     startTicking(); renderClockButtons(); autoSaveIfFolderChosen();
@@ -1316,6 +1340,7 @@ function renderClockButtons(){
 renderClockButtons();
 updateClockDisplay();
 renderClockLog();
+updateDurationInfo();
 
 // --- Cartons (avertissement automatique au 2e jaune) ---
 const cardsListEl = document.getElementById('cards-list');
@@ -1900,6 +1925,7 @@ function buildMatchData(){
   return {
     genere_le: new Date().toISOString(),
     type_observation: observationType === 'central' ? 'Arbitre Central' : 'Arbitre Assistant',
+    duree_match_minutes: matchDuration(),
     match: {
       competition: val('f-competition'),
       match: val('f-match'),
@@ -2203,6 +2229,8 @@ function loadMatchData(data){
 
   // Kilomètres / indemnités
   setVal('f-km', data.indemnites ? data.indemnites.kilometres_aller : '');
+  setVal('f-duree', data.duree_match_minutes === 80 ? 80 : 90);
+  updateDurationInfo();
 
   // Rafraîchit tous les affichages
   syncClubLabels();
