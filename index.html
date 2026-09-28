@@ -1824,6 +1824,12 @@ async function saveMatchFile(filename, content, mime){
   return false;
 }
 
+// Convertit une date AAAA-MM-JJ en JJ/MM/AAAA (format français)
+function dateFR(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
+}
+
 function esc(s){
   return (s || '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
@@ -1872,7 +1878,7 @@ ul{padding-left:20px;}
 <h1>Rapport d'Observateur — ${esc(data.type_observation)}</h1>
 <div class="meta">
 <p><b>Généré le :</b> ${new Date(data.genere_le).toLocaleString('fr-FR')}</p>
-<p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(data.match.date)}</p>
+<p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(dateFR(data.match.date))}</p>
 <p><b>Arbitre :</b> ${esc(data.match.arbitre)} &nbsp; | &nbsp; <b>Catégorie :</b> ${esc(data.match.categorie)}</p>
 <p><b>Arbitre assistant 1 :</b> ${esc(data.match.arbitre_assistant_1)} &nbsp; | &nbsp; <b>Arbitre assistant 2 :</b> ${esc(data.match.arbitre_assistant_2)}</p>
 <p><b>Observateur :</b> ${esc(data.match.observateur)}</p>
