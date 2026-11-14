@@ -34,6 +34,22 @@
     --ms:#b23a2f;
   }
   *{box-sizing:border-box;}
+  .photo-wrap{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px;}
+  .photo-wrap h3{margin:0 0 8px;font-size:1rem;color:var(--navy);}
+  .photo-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .photo-actions button,.photo-item button,.desig-panel button{font-family:inherit;font-size:.9rem;font-weight:700;border:none;border-radius:6px;padding:9px 14px;cursor:pointer;background:var(--navy);color:#fff;}
+  .photo-actions button.alt,.desig-panel button.alt{background:#fff;color:var(--navy);border:1.5px solid var(--navy);}
+  .photo-status{font-size:.85rem;color:var(--ink-soft);margin:4px 0;}
+  .photo-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px;}
+  .photo-item{border:1px solid var(--line);border-radius:8px;padding:6px;background:#fff;}
+  .photo-item img{width:100%;height:auto;border-radius:4px;display:block;}
+  .photo-item .cap{font-size:.78rem;color:var(--ink);margin:6px 0;line-height:1.3;}
+  .photo-item button{background:var(--red);padding:5px 10px;font-size:.8rem;}
+  .photo-opt{font-size:.85rem;margin-top:8px;display:flex;gap:6px;align-items:center;}
+  .desig-panel{border:1.5px solid var(--navy);border-radius:8px;padding:10px;margin-top:10px;background:#f4f7fc;}
+  .desig-panel .field{margin-bottom:6px;}
+  .desig-panel details{font-size:.8rem;color:var(--ink-soft);margin:6px 0;}
+  .desig-panel pre{white-space:pre-wrap;font-size:.75rem;}
   body{
     margin:0;
     font-family:'Georgia', 'Times New Roman', serif;
@@ -740,6 +756,20 @@
 
   <div class="tabpanel active" id="tabpanel-rapport">
 
+  <div class="photo-wrap">
+    <h3>📷 Photo et désignation</h3>
+    <div class="photo-actions">
+      <button type="button" id="btn-photo">📷 Photo de l'arbitre</button>
+      <button type="button" id="btn-designation" class="alt">📄 Lire une désignation (photo / capture)</button>
+    </div>
+    <input type="file" id="input-photo" accept="image/*" style="display:none">
+    <input type="file" id="input-designation" accept="image/*" style="display:none">
+    <div class="photo-status" id="photo-status"></div>
+    <div class="photo-list" id="photo-list"></div>
+    <label class="photo-opt" id="photo-pdf-opt"><input type="checkbox" id="f-photo-pdf"> Afficher les photos dans le rapport PDF</label>
+    <div id="designation-panel"></div>
+  </div>
+
   <div class="meta">
     <div class="field"><label>Compétition</label><input type="text" id="f-competition"></div>
     <div class="field"><label>Match</label><input type="text" id="f-match" placeholder="ex : DOLOMIEU US 2 / FC LAUZES 2"></div>
@@ -757,6 +787,7 @@
         <option value="80">80 minutes (2 × 40)</option>
       </select>
     </div>
+    <div class="field"><label>Heure du coup d'envoi</label><input type="time" id="f-heure"></div>
   </div>
 
   <div class="legend">
@@ -1404,6 +1435,187 @@ document.getElementById('cd-num').addEventListener('keydown', (e) => {
 
 renderCards();
 
+// ===== Photos de l'arbitre + lecture de désignation =====
+let photos = [];
+const MAX_PHOTOS = 4;
+function hhmm(iso){
+  try{ return new Date(iso).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}).replace(':','h'); }catch(e){ return ''; }
+}
+function photoCaptionText(takenAt){
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const dIso = (takenAt || '').slice(0,10);
+  const d = g('f-date') || dIso;
+  const parts = [g('f-arbitre'), g('f-match')].filter(Boolean);
+  let when = d ? dateFR(d) : '';
+  const hh = g('f-heure') ? g('f-heure').replace(':','h') : hhmm(takenAt);
+  if(hh) when += (when ? ' à ' : '') + hh;
+  if(when) parts.push(when);
+  return parts.join(' — ');
+}
+function setPhotoStatus(msg){ const el = document.getElementById('photo-status'); if(el) el.textContent = msg || ''; }
+function renderPhotos(){
+  const list = document.getElementById('photo-list');
+  if(!list) return;
+  list.innerHTML = '';
+  photos.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-item';
+    const img = document.createElement('img'); img.src = p.data; img.alt = 'Photo ' + (i+1);
+    const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = photoCaptionText(p.takenAt);
+    const del = document.createElement('button'); del.type = 'button'; del.textContent = 'Supprimer';
+    del.addEventListener('click', () => { photos.splice(i,1); renderPhotos(); });
+    div.appendChild(img); div.appendChild(cap); div.appendChild(del);
+    list.appendChild(div);
+  });
+  const opt = document.getElementById('photo-pdf-opt');
+  if(opt) opt.style.display = photos.length ? 'flex' : 'none';
+}
+function imageFileToCanvas(file, maxDim){
+  return new Promise((resolve, reject) => {
+    const draw = (src, w, h, done) => {
+      const k = Math.min(1, maxDim / Math.max(w, h));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w*k)); c.height = Math.max(1, Math.round(h*k));
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(src, 0, 0, c.width, c.height);
+      done(c);
+    };
+    const viaImg = () => {
+      const url = URL.createObjectURL(file);
+      const im = new Image();
+      im.onload = () => { draw(im, im.naturalWidth, im.naturalHeight, c => { URL.revokeObjectURL(url); resolve(c); }); };
+      im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')); };
+      im.src = url;
+    };
+    if(window.createImageBitmap){
+      createImageBitmap(file).then(bm => draw(bm, bm.width, bm.height, resolve)).catch(viaImg);
+    } else viaImg();
+  });
+}
+async function addPhotoFile(file){
+  if(!file) return;
+  if(photos.length >= MAX_PHOTOS){ setPhotoStatus('Maximum ' + MAX_PHOTOS + ' photos par rapport.'); return; }
+  try{
+    const c = await imageFileToCanvas(file, 1280);
+    photos.push({ data: c.toDataURL('image/jpeg', 0.75), takenAt: new Date().toISOString() });
+    setPhotoStatus('Photo ajoutée (' + photos.length + '/' + MAX_PHOTOS + ').');
+    renderPhotos();
+  }catch(e){ setPhotoStatus('Impossible de lire cette image.'); }
+}
+document.getElementById('btn-photo').addEventListener('click', () => document.getElementById('input-photo').click());
+document.getElementById('input-photo').addEventListener('change', e => { addPhotoFile(e.target.files[0]); e.target.value = ''; });
+['f-arbitre','f-match','f-date','f-heure'].forEach(id => document.getElementById(id).addEventListener('input', renderPhotos));
+
+// --- Lecture de désignation (OCR) ---
+const MOIS_FR = {janvier:1,fevrier:2,mars:3,avril:4,mai:5,juin:6,juillet:7,aout:8,septembre:9,octobre:10,novembre:11,decembre:12};
+function stripAcc(t){ return t.normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function parseDesignation(raw){
+  const out = { competition:'', match:'', arbitre:'', aa1:'', aa2:'', date:'', heure:'', categorie:'' };
+  const lines = String(raw||'').split(/\r?\n/).map(l => l.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const clean = v => v.replace(/^[\s:;\-–—]+/,'').trim();
+  const grab = (re) => { for(const l of lines){ const m = stripAcc(l).match(re); if(m){ const v = clean(l.slice(m.index + m[0].length)); if(v) return v; } } return ''; };
+  out.competition = grab(/^(competition|championnat|epreuve)\s*:?/i);
+  out.match = grab(/^(match|rencontre)\s*:?/i);
+  out.aa1 = grab(/^(arbitre\s+)?(assistant|adjoint)\s*(n°?\s*)?1\s*:?/i) || grab(/^AA\s*1\s*:?/i);
+  out.aa2 = grab(/^(arbitre\s+)?(assistant|adjoint)\s*(n°?\s*)?2\s*:?/i) || grab(/^AA\s*2\s*:?/i);
+  if(!out.aa1 && !out.aa2){
+    const v = grab(/^(arbitres?\s+)?(assistants|adjoints)\s*:?/i);
+    if(v){ const p = v.split(/\s*(?:,|;|\/| et )\s*/); out.aa1 = p[0]||''; out.aa2 = p[1]||''; }
+  }
+  for(const l of lines){
+    const m = stripAcc(l).match(/^arbitre(\s+central)?\s*:?\s*/i);
+    if(m && !/assistant|adjoint/i.test(stripAcc(l).slice(0,m[0].length+12))){ const v = clean(l.slice(m[0].length)); if(v){ out.arbitre = v; break; } }
+  }
+  // date
+  for(const l of lines){
+    if(/genere|imprime|edite/i.test(stripAcc(l))) continue;
+    const a = l.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/);
+    if(a){ let y = +a[3]; if(y < 100) y += 2000; const mo = +a[2], d = +a[1];
+      if(mo>=1&&mo<=12&&d>=1&&d<=31){ out.date = y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0'); break; } }
+    const b = stripAcc(l).toLowerCase().match(/\b(\d{1,2})(?:er)?\s+(janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+(\d{4})\b/);
+    if(b){ out.date = b[3]+'-'+String(MOIS_FR[b[2]]).padStart(2,'0')+'-'+String(+b[1]).padStart(2,'0'); break; }
+  }
+  // heure
+  const timeRe = /\b([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?\b/i;
+  const fmt = m => String(+m[1]).padStart(2,'0') + ':' + (m[2] || '00');
+  const pref = lines.filter(l => /heure|horaire|coup d.?envoi|\bko\b/i.test(stripAcc(l)) && !/genere|imprime|edite/i.test(stripAcc(l)));
+  for(const l of pref){ const m = l.match(timeRe); if(m){ out.heure = fmt(m); break; } }
+  if(!out.heure){ for(const l of lines){ if(/genere|imprime|edite/i.test(stripAcc(l))) continue; const m = l.replace(/\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}/g,'').match(/\b([01]?\d|2[0-3])\s*[h:]\s*([0-5]\d)\b/i); if(m){ out.heure = fmt(m); break; } } }
+  // match de repli
+  if(!out.match){
+    for(const l of lines){
+      if(/\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}/.test(l) || /:/.test(l.slice(0,14)) && /^(competition|arbitre|date|heure)/i.test(stripAcc(l))) continue;
+      const m = l.match(/^(.*?[A-Za-zÀ-ÿ]{3,}.*?)\s*(?:\/|\s-\s|\bvs\b|\bcontre\b)\s*([A-Za-zÀ-ÿ]{3,}.*)$/i);
+      if(m){ out.match = l; break; }
+    }
+  }
+  const cat = lines.join(' ').match(/\b(U\s?\d{2}|seniors?|veterans?|vétérans?|feminines?|féminines?)\b/i);
+  if(cat) out.categorie = cat[1].replace(/\s+/,'');
+  return out;
+}
+function loadScriptOnce(src){
+  return new Promise((resolve, reject) => {
+    const ex = document.querySelector('script[data-lazy="'+src+'"]');
+    if(ex){ if(ex.dataset.done){ resolve(); } else { ex.addEventListener('load', resolve); ex.addEventListener('error', reject); } return; }
+    const sc = document.createElement('script'); sc.src = src; sc.dataset.lazy = src;
+    sc.onload = () => { sc.dataset.done = '1'; resolve(); }; sc.onerror = () => reject(new Error('chargement impossible'));
+    document.head.appendChild(sc);
+  });
+}
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+async function readDesignation(file){
+  if(!file) return;
+  if(!navigator.onLine){ setPhotoStatus('Connexion internet nécessaire pour lire une désignation.'); return; }
+  try{
+    setPhotoStatus('Préparation de l\'image…');
+    const canvas = await imageFileToCanvas(file, 2000);
+    setPhotoStatus('Chargement du lecteur de texte (la 1re fois, ça peut prendre une minute)…');
+    await loadScriptOnce(TESSERACT_URL);
+    const res = await Tesseract.recognize(canvas, 'fra', { logger: m => {
+      if(m.status === 'recognizing text') setPhotoStatus('Lecture en cours… ' + Math.round((m.progress||0)*100) + ' %');
+    }});
+    const text = (res && res.data && res.data.text) || '';
+    setPhotoStatus(text.trim() ? 'Lecture terminée : vérifiez les champs ci-dessous.' : 'Aucun texte reconnu. Essayez une image plus nette.');
+    showDesignationPanel(parseDesignation(text), text);
+  }catch(e){
+    setPhotoStatus('Lecture impossible (' + (e && e.message ? e.message : 'erreur') + '). Vérifiez votre connexion et réessayez.');
+  }
+}
+function showDesignationPanel(v, raw){
+  const box = document.getElementById('designation-panel');
+  const fields = [['competition','Compétition','text'],['match','Match','text'],['arbitre','Arbitre','text'],['aa1','Arbitre Assistant 1','text'],['aa2','Arbitre Assistant 2','text'],['categorie','Catégorie','text'],['date','Date','date'],['heure','Heure','time']];
+  box.innerHTML = '<div class="desig-panel"><b>Résultat de la lecture (à vérifier et corriger)</b></div>';
+  const panel = box.firstChild;
+  fields.forEach(([k,l,t]) => {
+    const f = document.createElement('div'); f.className = 'field';
+    const lab = document.createElement('label'); lab.textContent = l;
+    const inp = document.createElement('input'); inp.type = t; inp.value = v[k] || ''; inp.dataset.k = k;
+    f.appendChild(lab); f.appendChild(inp); panel.appendChild(f);
+  });
+  const det = document.createElement('details'); const sm = document.createElement('summary'); sm.textContent = 'Texte brut lu';
+  const pre = document.createElement('pre'); pre.textContent = raw || ''; det.appendChild(sm); det.appendChild(pre); panel.appendChild(det);
+  const ok = document.createElement('button'); ok.type = 'button'; ok.textContent = 'Appliquer au rapport';
+  const no = document.createElement('button'); no.type = 'button'; no.className = 'alt'; no.textContent = 'Annuler'; no.style.marginLeft = '8px';
+  ok.addEventListener('click', () => {
+    const g = k => panel.querySelector('[data-k="'+k+'"]').value.trim();
+    const set = (id, x) => { if(x){ document.getElementById(id).value = x; } };
+    set('f-competition', g('competition')); set('f-arbitre', g('arbitre')); set('f-aa1', g('aa1')); set('f-aa2', g('aa2'));
+    set('f-cat', g('categorie')); set('f-date', g('date')); set('f-heure', g('heure'));
+    const m = g('match');
+    if(m){
+      const p = m.split(/\s*(?:\/|\s-\s|\bvs\b|\bcontre\b)\s*/i);
+      if(p.length >= 2){ document.getElementById('f-club-dom').value = p[0]; document.getElementById('f-club-ext').value = p.slice(1).join(' / '); syncClubLabels(); }
+      else { document.getElementById('f-match').value = m; }
+    }
+    renderPhotos(); box.innerHTML = ''; setPhotoStatus('Désignation appliquée au rapport.');
+  });
+  no.addEventListener('click', () => { box.innerHTML = ''; setPhotoStatus(''); });
+  panel.appendChild(ok); panel.appendChild(no);
+}
+document.getElementById('btn-designation').addEventListener('click', () => document.getElementById('input-designation').click());
+document.getElementById('input-designation').addEventListener('change', e => { readDesignation(e.target.files[0]); e.target.value = ''; });
+renderPhotos();
+
 // Reflète le nom des clubs dans le sélecteur de cartons
 function syncClubLabels(){
   const dom = document.getElementById('f-club-dom').value.trim();
@@ -1412,6 +1624,7 @@ function syncClubLabels(){
   document.getElementById('opt-ext').textContent = ext || 'Extérieur';
   document.getElementById('f-match').value = [dom, ext].filter(Boolean).join(' / ');
   if(typeof renderGoals === 'function') renderGoals();
+  if(typeof renderPhotos === 'function') renderPhotos();
 }
 document.getElementById('f-club-dom').addEventListener('input', syncClubLabels);
 document.getElementById('f-club-ext').addEventListener('input', syncClubLabels);
@@ -1850,6 +2063,9 @@ function buildMatchHTML(data){
   });
 
   const note = data.note.manuelle !== null ? data.note.manuelle : data.note.automatique;
+  const photosHTML = (data.photo_dans_pdf && Array.isArray(data.photos) && data.photos.length)
+    ? '<div class="photos">' + data.photos.map(p => '<figure><img src="' + esc(p.data) + '"><figcaption>' + esc(p.legende || '') + '</figcaption></figure>').join('') + '</div>'
+    : '';
 
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
 <title>Rapport — ${esc(data.match.match)}</title>
@@ -1864,6 +2080,10 @@ th{background:#f6f5f1;}
 .meta p{margin:4px 0;}
 .note{font-size:2rem;font-weight:bold;color:#0a1f4d;}
 ul{padding-left:20px;}
+.photos{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;}
+.photos figure{margin:0;width:48%;page-break-inside:avoid;}
+.photos img{width:100%;height:auto;border:1px solid #dfdcd3;}
+.photos figcaption{font-size:.75rem;color:#5b6270;margin-top:3px;}
 @page{ size: A4; margin: 18mm 16mm; }
 @media print{
   body{margin:0;max-width:none;}
@@ -1878,7 +2098,7 @@ ul{padding-left:20px;}
 <h1>Rapport d'Observateur — ${esc(data.type_observation)}</h1>
 <div class="meta">
 <p><b>Généré le :</b> ${new Date(data.genere_le).toLocaleString('fr-FR')}</p>
-<p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(dateFR(data.match.date))}</p>
+<p><b>Compétition :</b> ${esc(data.match.competition)} &nbsp; | &nbsp; <b>Match :</b> ${esc(data.match.match)} &nbsp; | &nbsp; <b>Date :</b> ${esc(dateFR(data.match.date))}${data.match.heure ? ' à ' + esc(String(data.match.heure).replace(':','h')) : ''}</p>
 <p><b>Arbitre :</b> ${esc(data.match.arbitre)} &nbsp; | &nbsp; <b>Catégorie :</b> ${esc(data.match.categorie)}</p>
 <p><b>Arbitre assistant 1 :</b> ${esc(data.match.arbitre_assistant_1)} &nbsp; | &nbsp; <b>Arbitre assistant 2 :</b> ${esc(data.match.arbitre_assistant_2)}</p>
 <p><b>Observateur :</b> ${esc(data.match.observateur)}</p>
@@ -1886,6 +2106,7 @@ ul{padding-left:20px;}
 <p><b>Score final :</b> ${data.score.domicile} — ${data.score.exterieur}</p>
 </div>
 
+${photosHTML}
 <h2>Note globale : <span class="note">${note !== null ? note : '—'} / 20</span></h2>
 <p><b>Bilan :</b> ${esc(data.bilan)}</p>
 
@@ -1932,6 +2153,8 @@ function buildMatchData(){
     genere_le: new Date().toISOString(),
     type_observation: observationType === 'central' ? 'Arbitre Central' : 'Arbitre Assistant',
     duree_match_minutes: matchDuration(),
+    photos: photos.map(p => ({ data: p.data, takenAt: p.takenAt, legende: photoCaptionText(p.takenAt) })),
+    photo_dans_pdf: !!document.getElementById('f-photo-pdf').checked,
     match: {
       competition: val('f-competition'),
       match: val('f-match'),
@@ -1941,6 +2164,7 @@ function buildMatchData(){
       arbitre: val('f-arbitre'),
       observateur: val('f-observateur') || val('f-observateur2'),
       date: val('f-date'),
+      heure: val('f-heure'),
       club_domicile: { nom: val('f-club-dom') },
       club_exterieur: { nom: val('f-club-ext') }
     },
@@ -2156,6 +2380,10 @@ function loadMatchData(data){
   setVal('f-observateur', data.match.observateur);
   setVal('f-observateur2', data.match.observateur);
   setVal('f-date', data.match.date);
+  setVal('f-heure', data.match.heure);
+  photos = Array.isArray(data.photos) ? data.photos.filter(p => p && p.data).map(p => ({ data: p.data, takenAt: p.takenAt || '' })) : [];
+  document.getElementById('f-photo-pdf').checked = !!data.photo_dans_pdf;
+  renderPhotos();
   if(data.match.club_domicile){
     setVal('f-club-dom', data.match.club_domicile.nom);
   }
