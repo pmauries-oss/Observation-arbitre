@@ -197,6 +197,10 @@
     min-height:34px;
   }
   .comment textarea:focus{outline:none;border-color:var(--navy);color:var(--ink);}
+  .sec-comment{background:#f4f3ef;padding:14px 16px;border-top:1px solid var(--line);}
+  .sec-comment label{display:block;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.85rem;text-transform:uppercase;letter-spacing:.03em;color:var(--navy);margin-bottom:8px;}
+  .sec-comment textarea{width:100%;min-height:110px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.9rem;color:var(--ink);border:1.5px solid var(--ink);border-radius:2px;background:#fff;padding:8px 10px;resize:vertical;}
+  .sec-comment textarea:focus{outline:none;border-color:var(--navy);}
 
   .sub-score{
     font-family:'Helvetica Neue',Arial,sans-serif;
@@ -984,27 +988,28 @@ const DATA_ASSISTANT = [
 ];
 
 const DATA_CENTRAL = [
-  { key:"physique", cls:"sec-physique", title:"Qualités athlétiques au service du jeu", items:[
-    "Activité et condition physique, endurance",
-    "Changement de rythme en adéquation avec l'évolution du jeu",
+  { key:"physique", cls:"sec-physique", sectionComment:true, title:"Potentiel physique au service du jeu", items:[
+    "Activité et condition physique / endurance",
+    "Changements de rythme en adéquation avec l'évolution du jeu",
     "Placements sur remises en jeu",
     "Occupation adaptée de l'aire de jeu (diagonale) et anticipation",
-    "Utilisation de la course à reculons"
+    "Utilisation des différents styles de courses (courses à reculons, aisance)"
   ]},
-  { key:"technique", cls:"sec-technique", title:"Compétences techniques", items:[
-    "Application des lois du jeu, exécution des remises en jeu (ballons arrêtés, murs, coup franc, rentrée de touche)",
-    "Détection des fautes, application de l'avantage",
-    "Lisibilité des décisions, signalisations claires",
-    "Protection des joueurs (tacles, semelles)",
+  { key:"technique", cls:"sec-technique", sectionComment:true, title:"Compétences techniques", items:[
+    "Application des lois du jeu et exécution des remises en jeu (ballons arrêtés, murs, coups francs, rentrée de touche)",
+    "Détection des fautes",
+    "Application de l'avantage",
+    "Lisibilité des décisions (signalisations claires)",
+    "Protection des joueur·se·s (semelles, coudes, tacles)",
     "Coup de sifflet net et sans équivoque (tonalité, sonorité)",
-    "Procédures des remplacements et des joueurs blessés"
+    "Procédures des remplacements et des joueur·se·s blessé·e·s"
   ]},
-  { key:"disciplinaire", cls:"sec-horsjeu", title:"Compétences disciplinaires", items:[
-    "Prévention et dissuasion par le Rappel à l'Ordre",
+  { key:"disciplinaire", cls:"sec-horsjeu", sectionComment:true, title:"Compétences disciplinaires - gestion du match", items:[
+    "Prévention et dissuasion par la mise en garde",
     "Procédure de délivrance des sanctions disciplinaires",
-    "Utilisation d'une manière cohérente et pertinente des sanctions disciplinaires (avertissement/exclusion)"
+    "Utilisation d'une manière cohérente et pertinente des sanctions disciplinaires (avertissement, exclusion)"
   ]},
-  { key:"personnalite", cls:"sec-personnalite", title:"Personnalité et management", items:[
+  { key:"personnalite", cls:"sec-personnalite", sectionComment:true, title:"Personnalité et management", items:[
     "Autorité naturelle (se faire respecter sans autoritarisme)",
     "Collaboration avec les assistants",
     "Courage et prise de responsabilités",
@@ -1039,10 +1044,11 @@ function renderSections(){
             <label class="opt pa"><input type="radio" name="${name}" value="PA"><span>PA</span></label>
             <label class="opt ms"><input type="radio" name="${name}" value="MS"><span>MS</span></label>
           </div>
-          <div class="comment"><textarea placeholder="Constats et conseils…" data-crit="${name}"></textarea></div>
+          ${section.sectionComment ? '' : `<div class="comment"><textarea placeholder="Constats et conseils…" data-crit="${name}"></textarea></div>`}
         </div>`;
     });
-    sec.innerHTML = `<div class="section-head">${section.title}</div>${rows}
+    const secComment = section.sectionComment ? `<div class="sec-comment"><label for="sc-${section.key}">Constats et conseils</label><textarea id="sc-${section.key}" data-sec="${section.key}"></textarea></div>` : '';
+    sec.innerHTML = `<div class="section-head">${section.title}</div>${rows}${secComment}
       <div class="sub-score" data-sub="${section.key}">Sous-total : <b>—</b></div>`;
     container.appendChild(sec);
   });
@@ -2108,11 +2114,21 @@ function buildMatchHTML(data){
   });
   Object.keys(bySection).forEach(sec => {
     const pageBreak = sec === 'Jugement du hors-jeu' ? 'style="page-break-before:always;"' : '';
-    sectionsHTML += `<h3 ${pageBreak}>${esc(sec)}</h3><table><tr><th>Critère</th><th>Évaluation</th><th>Commentaire</th></tr>`;
-    bySection[sec].forEach(c => {
-      sectionsHTML += `<tr><td>${esc(c.critere)}</td><td><b>${esc(c.evaluation || '—')}</b></td><td>${esc(c.commentaire || '')}</td></tr>`;
-    });
-    sectionsHTML += `</table>`;
+    const cs = data.commentaires_sections;
+    const hasSec = cs && Object.prototype.hasOwnProperty.call(cs, sec);
+    if(hasSec){
+      sectionsHTML += `<h3 ${pageBreak}>${esc(sec)}</h3><table><tr><th>Critère</th><th style="width:90px;">Évaluation</th></tr>`;
+      bySection[sec].forEach(c => {
+        sectionsHTML += `<tr><td>${esc(c.critere)}</td><td><b>${esc(c.evaluation || '—')}</b></td></tr>`;
+      });
+      sectionsHTML += `<tr><td colspan="2"><b>Constats et conseils :</b><br>${esc(cs[sec] || '').replace(/\n/g,'<br>')}</td></tr></table>`;
+    } else {
+      sectionsHTML += `<h3 ${pageBreak}>${esc(sec)}</h3><table><tr><th>Critère</th><th>Évaluation</th><th>Commentaire</th></tr>`;
+      bySection[sec].forEach(c => {
+        sectionsHTML += `<tr><td>${esc(c.critere)}</td><td><b>${esc(c.evaluation || '—')}</b></td><td>${esc(c.commentaire || '')}</td></tr>`;
+      });
+      sectionsHTML += `</table>`;
+    }
   });
 
   const note = data.note.manuelle !== null ? data.note.manuelle : data.note.automatique;
@@ -2191,9 +2207,17 @@ function buildMatchData(){
         section: section.title,
         critere: label,
         evaluation: checked ? checked.value : null,
-        commentaire: commentEl.value || null
+        commentaire: commentEl && commentEl.value ? commentEl.value : null
       });
     });
+  });
+
+  const commentaires_sections = {};
+  DATA.forEach(section => {
+    if(section.sectionComment){
+      const el = document.querySelector(`textarea[data-sec="${section.key}"]`);
+      commentaires_sections[section.title] = el ? el.value : '';
+    }
   });
 
   const bilanEl = document.querySelector('input[name="bilan"]:checked');
@@ -2222,6 +2246,7 @@ function buildMatchData(){
       club_exterieur: { nom: val('f-club-ext') }
     },
     criteres,
+    commentaires_sections,
     note: { automatique: noteAuto, manuelle: manual !== '' ? parseFloat(manual) : null },
     bilan: bilanEl ? bilanEl.value : null,
     appreciation_generale: val('f-appreciation'),
@@ -2467,6 +2492,17 @@ function loadMatchData(data){
         const commentEl = document.querySelector(`textarea[data-crit="${name}"]`);
         if(commentEl && c.commentaire) commentEl.value = c.commentaire;
       });
+    });
+    // Commentaires par section (fiche FFF) ; anciens rapports : on regroupe les commentaires par critère
+    DATA.forEach(section => {
+      if(!section.sectionComment) return;
+      const el = document.querySelector(`textarea[data-sec="${section.key}"]`);
+      if(!el) return;
+      const cs = data.commentaires_sections;
+      if(cs && Object.prototype.hasOwnProperty.call(cs, section.title)){ el.value = cs[section.title] || ''; }
+      else {
+        el.value = data.criteres.filter(c => c.section === section.title && c.commentaire).map(c => c.commentaire).join('\n');
+      }
     });
   }
 
