@@ -203,6 +203,8 @@
   .sec-comment label{display:block;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.85rem;text-transform:uppercase;letter-spacing:.03em;color:var(--navy);margin-bottom:8px;}
   .sec-comment textarea{width:100%;min-height:110px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.9rem;color:var(--ink);border:1.5px solid var(--ink);border-radius:2px;background:#fff;padding:8px 10px;resize:vertical;}
   .sec-comment textarea:focus{outline:none;border-color:var(--navy);}
+  .gen-sum{font-family:'Helvetica Neue',Arial,sans-serif;font-size:.78rem;font-weight:700;background:#fff;color:var(--navy);border:1.5px solid var(--navy);border-radius:6px;padding:5px 10px;cursor:pointer;margin:0 0 6px;display:block;}
+  .sec-comment .gen-sec{font-family:'Helvetica Neue',Arial,sans-serif;font-size:.8rem;font-weight:700;background:#fff;color:var(--navy);border:1.5px solid var(--navy);border-radius:6px;padding:6px 12px;cursor:pointer;margin:0 0 8px;}
 
   .sub-score{
     font-family:'Helvetica Neue',Arial,sans-serif;
@@ -837,14 +839,17 @@
     <div>
       <div class="app-block">
         <label>Appréciation générale</label>
+        <button type="button" class="gen-sum" data-sum="appreciation">✨ Proposer un résumé d'après mes notes</button>
         <textarea id="f-appreciation"></textarea>
       </div>
       <div class="app-block">
         <label id="lbl-forts">Points forts de l'arbitre</label>
+        <button type="button" class="gen-sum" data-sum="forts">✨ Proposer un résumé d'après mes notes</button>
         <textarea id="f-forts"></textarea>
       </div>
       <div class="app-block">
         <label id="lbl-ameliorer">Points d'amélioration de l'arbitre</label>
+        <button type="button" class="gen-sum" data-sum="axes">✨ Proposer un résumé d'après mes notes</button>
         <textarea id="f-ameliorer"></textarea>
       </div>
     </div>
@@ -1023,6 +1028,140 @@ const DATA_CENTRAL = [
   ]}
 ];
 
+// Textes d'aide pour proposer les constats : s = sujet, c = conseil
+const CENTRAL_TEXT = {
+  physique: [
+    { s:"son activité et sa condition physique (endurance)", c:"entretenir sa condition physique pour tenir l'intensité du match jusqu'au bout" },
+    { s:"ses changements de rythme en adéquation avec le jeu", c:"adapter davantage son allure à l'évolution du jeu (accélérations sur les contre-attaques)" },
+    { s:"ses placements sur remises en jeu", c:"anticiper ses positions sur les remises en jeu pour avoir la meilleure vision" },
+    { s:"son occupation de l'aire de jeu (diagonale) et son anticipation", c:"mieux utiliser la diagonale et anticiper le sens du jeu" },
+    { s:"la variété de ses styles de courses (reculons, aisance)", c:"varier les courses (reculons, latérales) pour garder le jeu et les assistants dans son champ de vision" }
+  ],
+  technique: [
+    { s:"son application des lois du jeu et l'exécution des remises en jeu", c:"revoir la gestion des ballons arrêtés (murs, coups francs, rentrées de touche)" },
+    { s:"sa détection des fautes", c:"gagner en précision dans la détection des fautes" },
+    { s:"son application de l'avantage", c:"mieux apprécier l'avantage (situation, zone du terrain, joueurs concernés)" },
+    { s:"la lisibilité de ses décisions (signalisations claires)", c:"rendre les signalisations plus nettes et plus lisibles" },
+    { s:"la protection des joueur·se·s (semelles, coudes, tacles)", c:"être plus vigilant sur les fautes dangereuses (semelles, coudes, tacles)" },
+    { s:"son coup de sifflet net et sans équivoque", c:"soigner la tonalité et la sonorité du coup de sifflet" },
+    { s:"les procédures de remplacement et de prise en charge des blessé·e·s", c:"respecter strictement les procédures de remplacement et de prise en charge des blessé·e·s" }
+  ],
+  disciplinaire: [
+    { s:"la prévention et la dissuasion par la mise en garde", c:"utiliser davantage la mise en garde pour prévenir les tensions" },
+    { s:"la procédure de délivrance des sanctions disciplinaires", c:"respecter la procédure de délivrance (distance, posture, communication)" },
+    { s:"la cohérence et la pertinence de ses sanctions disciplinaires", c:"veiller à la cohérence et à la pertinence des sanctions tout au long du match" }
+  ],
+  personnalite: [
+    { s:"son autorité naturelle", c:"affirmer son autorité sans autoritarisme" },
+    { s:"sa collaboration avec les assistant·e·s", c:"renforcer la collaboration avec les assistant·e·s" },
+    { s:"son courage et sa prise de responsabilités", c:"oser prendre ses responsabilités sur les décisions importantes" },
+    { s:"son relationnel (délégué·e, dirigeant·e·s, capitaines, joueur·se·s) et sa présentation", c:"soigner le relationnel avec les délégué·e·s, dirigeant·e·s, capitaines et joueur·se·s, ainsi que la présentation" },
+    { s:"ses devoirs administratifs", c:"être rigoureux·se sur les devoirs administratifs" }
+  ]
+};
+function proposeSectionText(key){
+  const txt = CENTRAL_TEXT[key];
+  if(!txt) return '';
+  const groups = { PF:[], QA:[], PA:[], MS:[] };
+  txt.forEach((t, i) => {
+    const ch = document.querySelector(`input[name="${key}-${i}"]:checked`);
+    if(ch) groups[ch.value].push(t);
+  });
+  const join = (arr, sep) => arr.length < 2 ? (arr[0] || '') : arr.slice(0,-1).join(sep) + ' et ' + arr[arr.length-1];
+  const parts = [];
+  if(groups.PF.length) parts.push("L'arbitre se distingue par " + join(groups.PF.map(t => t.s), ', ') + '.');
+  if(groups.QA.length) parts.push((groups.PF.length ? 'On note également' : 'On note') + ' de bonnes bases (qualités acquises) sur ' + join(groups.QA.map(t => t.s), ', ') + '.');
+  if(groups.PA.length) parts.push('Des axes de progrès apparaissent sur ' + join(groups.PA.map(t => t.s), ', ') + ' : il lui est conseillé ' + join(groups.PA.map(t => 'de ' + t.c), ' ; ') + '.');
+  if(groups.MS.length) parts.push((groups.MS.length > 1 ? 'Des manquements significatifs sont relevés' : 'Un manquement significatif est relevé') + ' sur ' + join(groups.MS.map(t => t.s), ', ') + ' : il est important ' + join(groups.MS.map(t => 'de ' + t.c), ' ; ') + ' sans attendre.');
+  return parts.join(' ');
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest ? e.target.closest('.gen-sec') : null;
+  if(!btn) return;
+  const key = btn.dataset.gen;
+  const ta = document.querySelector(`textarea[data-sec="${key}"]`);
+  const text = proposeSectionText(key);
+  if(!text){ alert("Cochez d'abord au moins un critère (PF, QA, PA ou MS) dans cette section."); return; }
+  if(ta.value.trim() && !confirm("Remplacer le texte déjà saisi par la proposition ?")) return;
+  ta.value = text;
+  ta.focus();
+});
+
+// --- Résumé global (appréciation / points forts / axes de progrès) ---
+function joinFR(arr, sep){ return arr.length < 2 ? (arr[0] || '') : arr.slice(0,-1).join(sep) + ' et ' + arr[arr.length-1]; }
+function collectRatings(){
+  const out = { PF:[], QA:[], PA:[], MS:[], sections:[] };
+  DATA.forEach(section => {
+    let sum = 0, n = 0;
+    section.items.forEach((label, i) => {
+      const ch = document.querySelector(`input[name="${section.key}-${i}"]:checked`);
+      if(!ch) return;
+      sum += POINTS[ch.value]; n++;
+      const t = (observationType === 'central' && CENTRAL_TEXT[section.key] && CENTRAL_TEXT[section.key][i]) || null;
+      const low = label.charAt(0).toLowerCase() + label.slice(1);
+      out[ch.value].push({ s: t ? t.s : low, c: t ? t.c : '', sec: section.title });
+    });
+    if(n) out.sections.push({ title: section.title, avg: sum / n });
+  });
+  return out;
+}
+function proposeSummary(kind){
+  const r = collectRatings();
+  const total = r.PF.length + r.QA.length + r.PA.length + r.MS.length;
+  if(!total) return '';
+  const lc = t => t; // les sujets sont déjà rédigés avec leur déterminant
+  if(kind === 'forts'){
+    const parts = [];
+    if(r.PF.length) parts.push("L'arbitre a montré de réelles qualités, notamment " + joinFR(r.PF.map(t => lc(t.s)), ', ') + '.');
+    if(r.QA.length) parts.push((r.PF.length ? 'Par ailleurs, les' : 'Les') + ' fondamentaux sont maîtrisés : ' + joinFR(r.QA.map(t => lc(t.s)), ', ') + '.');
+    if(!parts.length) parts.push("Aucun point fort marquant n'a pu être relevé sur ce match ; les bases restent à consolider.");
+    return parts.join(' ');
+  }
+  if(kind === 'axes'){
+    const parts = [];
+    if(r.PA.length) parts.push('Pour progresser, le travail devra porter sur ' + joinFR(r.PA.map(t => t.s), ', ') + '.');
+    if(r.MS.length) parts.push("Une vigilance particulière est attendue sur " + joinFR(r.MS.map(t => t.s), ', ') + ", " + (r.MS.length > 1 ? "points qui devront être corrigés" : "point qui devra être corrigé") + " en priorité.");
+    const conseils = r.MS.concat(r.PA).filter(t => t.c);
+    if(conseils.length) parts.push('Concrètement, je lui conseille ' + joinFR(conseils.map(t => 'de ' + t.c), ' ; ') + '.');
+    if(!parts.length) parts.push("Aucun axe de progrès majeur n'est à signaler ; l'essentiel est de maintenir ce niveau d'exigence match après match.");
+    return parts.join(' ');
+  }
+  // appréciation générale
+  const data = buildMatchData();
+  const note = data.note.manuelle !== null ? data.note.manuelle : data.note.automatique;
+  const bilanEl = document.querySelector('input[name="bilan"]:checked');
+  let niveau = bilanEl ? bilanEl.value : null;
+  if(!niveau && note !== null) niveau = note >= 16.5 ? 'Excellent arbitrage' : note >= 13.5 ? 'Arbitrage conforme' : 'Arbitrage à améliorer';
+  const parts = [];
+  if(niveau === 'Excellent arbitrage') parts.push("Prestation de très bon niveau : l'arbitre a dirigé cette rencontre avec sérieux, maîtrise et autorité.");
+  else if(niveau === 'Arbitrage conforme') parts.push("Prestation globalement conforme aux attentes : l'arbitre a dirigé cette rencontre de façon sérieuse et appliquée.");
+  else if(niveau === 'Arbitrage à améliorer') parts.push("Prestation en deçà des attentes sur plusieurs points : l'arbitre a rencontré des difficultés qu'il lui faudra corriger.");
+  else parts.push("Voici le bilan de la prestation de l'arbitre sur cette rencontre.");
+  const secs = r.sections.slice().sort((a,b) => b.avg - a.avg);
+  const nomSec = x => '« ' + x.title.toLowerCase() + ' »';
+  if(secs.length > 1 && secs[0].avg > secs[secs.length-1].avg){
+    parts.push("Il s'appuie sur de vrais acquis dans le domaine " + nomSec(secs[0]) + ', alors que le domaine ' + nomSec(secs[secs.length-1]) + ' offre la plus belle marge de progression.');
+  } else if(secs.length === 1){
+    parts.push("L'évaluation porte pour l'instant sur le domaine " + nomSec(secs[0]) + '.');
+  }
+  if(r.PF.length) parts.push('On retiendra notamment ' + joinFR(r.PF.slice(0,2).map(t => lc(t.s)), ', ') + '.');
+  if(r.MS.length) parts.push((r.MS.length > 1 ? 'Certains manquements devront être corrigés dès que possible.' : 'Un manquement devra être corrigé dès que possible.'));
+  if(niveau === 'Excellent arbitrage') parts.push("Je l'encourage à conserver cette dynamique.");
+  else if(niveau === 'Arbitrage conforme') parts.push("Je l'encourage à poursuivre ses efforts pour franchir un cap.");
+  else if(niveau === 'Arbitrage à améliorer') parts.push("Avec un travail ciblé sur ces points, il peut progresser rapidement.");
+  return parts.join(' ');
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest ? e.target.closest('.gen-sum') : null;
+  if(!btn) return;
+  const kind = btn.dataset.sum;
+  const ta = document.getElementById(kind === 'appreciation' ? 'f-appreciation' : kind === 'forts' ? 'f-forts' : 'f-ameliorer');
+  const text = proposeSummary(kind);
+  if(!text){ alert("Cochez d'abord des critères (PF, QA, PA ou MS) dans les sections du dessus."); return; }
+  if(ta.value.trim() && !confirm("Remplacer le texte déjà saisi par la proposition ?")) return;
+  ta.value = text; ta.focus();
+});
+
 let observationType = 'assistant';
 let DATA = DATA_ASSISTANT;
 
@@ -1052,7 +1191,7 @@ function renderSections(){
           ${section.sectionComment ? '' : `<div class="comment"><textarea placeholder="Constats et conseils…" data-crit="${name}"></textarea></div>`}
         </div>`;
     });
-    const secComment = section.sectionComment ? `<div class="sec-comment"><label for="sc-${section.key}">Constats et conseils</label><textarea id="sc-${section.key}" data-sec="${section.key}"></textarea></div>` : '';
+    const secComment = section.sectionComment ? `<div class="sec-comment"><label for="sc-${section.key}">Constats et conseils</label><button type="button" class="gen-sec" data-gen="${section.key}">✨ Proposer un texte d'après mes cases cochées</button><textarea id="sc-${section.key}" data-sec="${section.key}"></textarea></div>` : '';
     sec.innerHTML = `<div class="section-head">${section.title}</div>${rows}${secComment}
       <div class="sub-score" data-sub="${section.key}">Sous-total : <b>—</b></div>`;
     container.appendChild(sec);
