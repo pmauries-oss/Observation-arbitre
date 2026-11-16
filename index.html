@@ -934,7 +934,7 @@
       </div>
       <div class="chrono-intro">Notez ce qui se passe minute par minute : décisions, incidents, hors-jeu litigieux, échanges avec l'arbitre… Les entrées sont triées automatiquement par minute.</div>
       <div class="chrono-add">
-        <div class="field"><label>Minute</label><input type="number" id="c-min" min="0" max="130" placeholder="ex : 34"><button type="button" class="now" id="c-now">⏱ Minute actuelle</button></div>
+        <div class="field"><label>Minute</label><input type="text" id="c-min" placeholder="ex : 34 ou 45+2" autocomplete="off"><button type="button" class="now" id="c-now">⏱ Minute actuelle</button></div>
         <div class="field"><label>Type</label>
           <select id="c-type">
             <option value="neutre">Constat</option>
@@ -1185,10 +1185,10 @@ function renderChrono(){
     list.innerHTML = '<div class="chrono-empty">Aucune note pour l\'instant — ajoutez la première ci-dessus.</div>';
     return;
   }
-  const sorted = [...chronoEntries].sort((a,b) => a.min - b.min);
+  const sorted = [...chronoEntries].sort((a,b) => sortKey(a) - sortKey(b));
   list.innerHTML = sorted.map(e => `
     <div class="chrono-item">
-      <div class="chrono-min">${e.min}'</div>
+      <div class="chrono-min">${minLabel(e)}</div>
       <div class="chrono-tag" style="background:${TAG_COLOR[e.type]}">${TAG_LABEL[e.type]}</div>
       <div class="chrono-text">${e.text}</div>
       <button type="button" class="chrono-del" data-id="${e.id}" title="Supprimer">✕</button>
@@ -1202,16 +1202,41 @@ function renderChrono(){
   });
 }
 
+// Horodatage du chrono : minute, période et libellé (45+1, 90+2…)
+function stampOf(min, per){
+  const d = matchDuration(), half = d/2;
+  const limit = per === 2 ? d : half;
+  const lab = (min >= limit && !(typeof phase !== 'undefined' && phase === 'pause')) ? `${limit}+${min-limit+1}'` : `${min}'`;
+  return { min, per, lab };
+}
+function liveStamp(){
+  if(typeof phase === 'undefined' || phase === 'avant') return { min:0, per:1, lab:"0'" };
+  const per = (phase === 'mt2' || phase === 'fin') ? 2 : 1;
+  const min = Math.floor(currentMatchSeconds()/60);
+  if(phase === 'pause') return { min: matchDuration()/2, per:1, lab: (matchDuration()/2)+"'" };
+  return stampOf(min, per);
+}
+function minLabel(x){ return x.lab || (x.min + "'"); }
+function sortKey(x){ return (x.per ? (x.per-1)*1000 : 0) + x.min; }
+// "45+2" saisi à la main -> horodatage
+function parseMinuteInput(v){
+  v = String(v).trim().replace(/['’]/g,'');
+  let m = v.match(/^(\d+)\s*\+\s*(\d+)$/);
+  if(m){ const base = parseInt(m[1],10), extra = parseInt(m[2],10);
+    return { min: base+extra-1, per: base >= matchDuration() ? 2 : 1, lab: `${base}+${extra}'` }; }
+  m = v.match(/^\d+$/);
+  return m ? { min: parseInt(v,10) } : null;
+}
 // Minute actuelle du chrono (null si le match n'a pas commencé)
 function liveMinute(){
   if(typeof phase === 'undefined' || phase === 'avant') return null;
-  return Math.floor(currentMatchSeconds()/60);
+  return liveStamp();
 }
 function fillLiveMinute(force){
   const minEl = document.getElementById('c-min');
-  const m = liveMinute();
-  if(m !== null && (force || minEl.value === '')) minEl.value = m;
-  return m !== null;
+  const st = liveMinute();
+  if(st !== null && (force || minEl.value === '')) minEl.value = st.lab.replace("'",'');
+  return st !== null;
 }
 document.getElementById('c-now').addEventListener('click', () => {
   if(!fillLiveMinute(true)){ alert("Le match n'a pas encore commencé : appuyez sur COUP D'ENVOI ou saisissez la minute."); }
@@ -1230,7 +1255,9 @@ document.getElementById('c-add').addEventListener('click', () => {
     (min === '' ? minEl : textEl).focus();
     return;
   }
-  chronoEntries.push({ id: Date.now().toString(), min: parseInt(min,10), type: typeEl.value, text });
+  const st = parseMinuteInput(min);
+  if(!st){ minEl.focus(); return; }
+  chronoEntries.push(Object.assign({ id: Date.now().toString(), type: typeEl.value, text }, st));
   minEl.value = '';
   textEl.value = '';
   minEl.focus();
@@ -1298,18 +1325,25 @@ function renderClockLog(){
   clockLogEl.innerHTML = stoppageNotifs.slice(0,8).map(n => `
     <div class="clock-notif ${n.kind}">
       <span>${n.icon} ${n.text}</span>
-      <span class="n-min">${n.min}'</span>
+      <span class="n-min">${minLabel(n)}</span>
     </div>
   `).join('');
 }
 
 function pushNotif(kind, icon, text, min){
-  stoppageNotifs.unshift({ kind, icon, text, min });
+  const st = liveStamp();
+  stoppageNotifs.unshift({ kind, icon, text, min: st.min, per: st.per, lab: st.lab });
   renderClockLog();
 }
 
 function updateClockDisplay(){
-  clockTimeEl.textContent = fmt(currentMatchSeconds());
+  const csec = currentMatchSeconds();
+  const cst = (phase === 'mt1' || phase === 'mt2' || phase === 'fin') ? stampOf(Math.floor(csec/60), (phase === 'mt1') ? 1 : 2) : null;
+  if(cst && cst.lab.indexOf('+') > -1){
+    clockTimeEl.innerHTML = cst.lab.replace("'",'') + '<div style="font-size:.9rem;font-weight:400;opacity:.8;margin-top:2px;">' + fmt(csec) + '</div>';
+  } else {
+    clockTimeEl.textContent = fmt(csec);
+  }
   const stoppageNow = stoppageTotalSec + (arretActive ? Math.floor((Date.now()-arretStartMs)/1000) : 0);
   clockStoppageEl.innerHTML = "Temps d'arrêt cumulé : <b>" + fmt(stoppageNow) + "</b>";
 }
@@ -1402,7 +1436,7 @@ function renderCards(){
     <div class="card-entry${c.urgent ? ' urgent' : ''}">
       <span class="card-chip ${c.chipType}"></span>
       <span>${c.text}</span>
-      <span class="c-min">${c.min}'</span>
+      <span class="c-min">${minLabel(c)}</span>
     </div>
   `).join('');
 }
@@ -1414,7 +1448,7 @@ document.getElementById('cd-add').addEventListener('click', () => {
   const type = document.getElementById('cd-type').value;
   if(num === ''){ numEl.focus(); return; }
 
-  const min = phase === 'avant' ? 0 : Math.floor(currentMatchSeconds()/60);
+  const stamp = liveStamp(); const min = stamp.min, per = stamp.per, lab = stamp.lab;
   const key = team + '-' + num;
   if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
 
@@ -1422,25 +1456,25 @@ document.getElementById('cd-add').addEventListener('click', () => {
     cardsState[key].jaune++;
     if(cardsState[key].jaune >= 2){
       cardEntries.unshift({
-        chipType:'rouge', urgent:true, min,
+        chipType:'rouge', urgent:true, min, per, lab,
         text: `⚠️ 2e jaune — joueur n°${num} (${team}) → carton rouge obligatoire !`
       });
     } else {
-      cardEntries.unshift({ chipType:'jaune', urgent:false, min, text:`Carton jaune — joueur n°${num} (${team})` });
+      cardEntries.unshift({ chipType:'jaune', urgent:false, min, per, lab, text:`Carton jaune — joueur n°${num} (${team})` });
     }
   } else if(type === 'blanc'){
     cardsState[key].blanc++;
     if(cardsState[key].blanc >= 2){
       cardEntries.unshift({
-        chipType:'rouge', urgent:true, min,
+        chipType:'rouge', urgent:true, min, per, lab,
         text: `⚠️ 2e carton blanc — joueur n°${num} (${team}) → carton rouge obligatoire !`
       });
     } else {
-      cardEntries.unshift({ chipType:'blanc', urgent:false, min, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` });
+      cardEntries.unshift({ chipType:'blanc', urgent:false, min, per, lab, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` });
     }
   } else {
     cardsState[key].rouge++;
-    cardEntries.unshift({ chipType:'rouge', urgent:false, min, text:`Carton rouge direct — joueur n°${num} (${team})` });
+    cardEntries.unshift({ chipType:'rouge', urgent:false, min, per, lab, text:`Carton rouge direct — joueur n°${num} (${team})` });
   }
   numEl.value = '';
   numEl.focus();
@@ -1666,7 +1700,7 @@ function renderGoals(){
   goalsListEl.innerHTML = goalEntries.map(g => `
     <div class="goal-entry">
       <span>⚽ But — ${labelFor(g.team)}</span>
-      <span class="g-min">${g.min}'</span>
+      <span class="g-min">${minLabel(g)}</span>
     </div>
   `).join('');
 }
@@ -1678,9 +1712,9 @@ document.getElementById('btn-but').addEventListener('click', () => {
 });
 
 function recordGoal(team){
-  const min = phase === 'avant' ? 0 : Math.floor(currentMatchSeconds()/60);
+  const gst = liveStamp(); const min = gst.min;
   if(team === 'Domicile') scoreDom++; else scoreExt++;
-  goalEntries.unshift({ team, min });
+  goalEntries.unshift({ team, min, per: gst.per, lab: gst.lab });
   goalsChooserEl.classList.remove('open');
   renderGoals();
   autoSaveIfFolderChosen();
@@ -2193,9 +2227,9 @@ function buildMatchData(){
     appreciation_generale: val('f-appreciation'),
     points_forts: val('f-forts'),
     points_amelioration: val('f-ameliorer'),
-    chronologie_minute_par_minute: chronoEntries.sort((a,b)=>a.min-b.min).map(e => ({ minute:e.min, type: TAG_LABEL[e.type], texte:e.text })),
+    chronologie_minute_par_minute: chronoEntries.sort((a,b)=>sortKey(a)-sortKey(b)).map(e => ({ minute:e.min, periode:e.per, libelle:e.lab, type: TAG_LABEL[e.type], texte:e.text })),
     score: { domicile: scoreDom, exterieur: scoreExt },
-    buts: goalEntries.slice().reverse().map(g => ({ minute: g.min, equipe: labelFor(g.team) })),
+    buts: goalEntries.slice().reverse().map(g => ({ minute: g.min, periode: g.per, libelle: g.lab, equipe: labelFor(g.team) })),
     arrets_de_jeu: stoppageNotifs.slice().reverse(),
     cartons: cardEntries.slice().reverse(),
     temps_arret_cumule_secondes: stoppageTotalSec,
@@ -2448,7 +2482,7 @@ function loadMatchData(data){
   // Chronologie
   chronoEntries = (data.chronologie_minute_par_minute || []).map(e => ({
     id: Date.now().toString() + Math.random(),
-    min: e.minute,
+    min: e.minute, per: e.periode, lab: e.libelle,
     type: Object.keys(TAG_LABEL).find(k => TAG_LABEL[k] === e.type) || 'neutre',
     text: e.texte
   }));
@@ -2458,7 +2492,7 @@ function loadMatchData(data){
   scoreExt = data.score ? data.score.exterieur || 0 : 0;
   goalEntries = (data.buts || []).slice().reverse().map(g => ({
     team: g.equipe === (data.match.club_domicile && data.match.club_domicile.nom) ? 'Domicile' : (g.equipe === 'Domicile' || g.equipe === 'Extérieur' ? g.equipe : 'Domicile'),
-    min: g.minute
+    min: g.minute, per: g.periode, lab: g.libelle
   }));
 
   // Cartons
