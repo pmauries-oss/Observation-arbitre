@@ -653,6 +653,10 @@
     align-items:end;
   }
   .cards-add.subs-add{grid-template-columns:1fr 110px 110px auto;}
+  .pl-hint{font-family:'Helvetica Neue',Arial,sans-serif;font-size:.8rem;color:var(--navy);font-weight:700;min-height:1.1em;margin-top:6px;}
+  .roster-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0;}
+  .roster-panel-grid textarea{width:100%;min-height:220px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:.85rem;border:1.5px solid var(--line);border-radius:6px;padding:8px;background:#fff;}
+  @media(max-width:640px){.roster-panel-grid{grid-template-columns:1fr;}}
   .sub-del{margin-left:8px;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:.9rem;}
   .sub-chip{font-size:1.1rem;line-height:1;flex-shrink:0;}
   .cards-add .field label{margin-bottom:4px;}
@@ -948,7 +952,19 @@
           </div>
           <button type="button" id="cd-add">Enregistrer</button>
         </div>
+        <div class="pl-hint" id="cd-hint"></div>
         <div class="cards-list" id="cards-list"></div>
+      </div>
+      <div class="cards-wrap" id="roster-wrap">
+        <div class="cards-title">Feuille de match</div>
+        <div class="photo-actions">
+          <button type="button" id="btn-roster-img">📄 Importer la feuille de match (photo / capture)</button>
+          <button type="button" id="btn-roster-edit" class="alt">✏️ Saisir / coller la liste</button>
+        </div>
+        <input type="file" id="input-roster" accept="image/*" style="display:none">
+        <div class="photo-status" id="roster-status"></div>
+        <div class="photo-status" id="roster-summary">Aucune feuille de match enregistrée.</div>
+        <div id="roster-panel"></div>
       </div>
       <div class="cards-wrap" id="subs-wrap">
         <div class="cards-title">Remplacements</div>
@@ -963,6 +979,7 @@
           <div class="field"><label>N° entrant</label><input type="number" id="sb-in" min="1" max="99" placeholder="ex : 14"></div>
           <button type="button" id="sb-add">Enregistrer</button>
         </div>
+        <div class="pl-hint" id="sb-hint"></div>
         <div class="cards-list" id="subs-list"></div>
       </div>
       <div class="chrono-intro">Notez ce qui se passe minute par minute : décisions, incidents, hors-jeu litigieux, échanges avec l'arbitre… Les entrées sont triées automatiquement par minute.</div>
@@ -1603,6 +1620,15 @@ updateClockDisplay();
 renderClockLog();
 updateDurationInfo();
 
+// --- Feuille de match : noms des joueurs ---
+var rosters = { 'Domicile': {}, 'Extérieur': {} };
+function playerName(team, num){
+  if(!rosters || num === undefined || num === null || num === '') return '';
+  const r = rosters[team];
+  return (r && r[String(parseInt(num,10))]) || '';
+}
+function withName(team, num){ const n = playerName(team, num); return n ? ' ' + n : ''; }
+
 // --- Remplacements ---
 const subsListEl = document.getElementById('subs-list');
 let subEntries = [];
@@ -1616,7 +1642,7 @@ function renderSubs(){
     const div = document.createElement('div'); div.className = 'card-entry';
     const chip = document.createElement('span'); chip.className = 'sub-chip'; chip.textContent = '🔁';
     const txt = document.createElement('span');
-    txt.textContent = 'Remplacement (' + labelFor(e.team) + ') — n°' + e.sortant + ' sort, n°' + e.entrant + ' entre';
+    txt.textContent = 'Remplacement (' + labelFor(e.team) + ') — n°' + e.sortant + withName(e.team, e.sortant) + ' sort, n°' + e.entrant + withName(e.team, e.entrant) + ' entre';
     const mn = document.createElement('span'); mn.className = 'c-min'; mn.textContent = minLabel(e);
     const del = document.createElement('button'); del.type = 'button'; del.className = 'sub-del'; del.title = 'Supprimer'; del.textContent = '✕';
     del.addEventListener('click', () => { subEntries.splice(i, 1); renderSubs(); autoSaveIfFolderChosen(); });
@@ -1637,6 +1663,151 @@ document.getElementById('sb-in').addEventListener('keydown', (e) => { if(e.key =
 ['f-club-dom','f-club-ext'].forEach(id => document.getElementById(id).addEventListener('input', renderSubs));
 renderSubs();
 
+// --- Feuille de match : import / saisie ---
+function rosterSummary(){
+  const d = Object.keys(rosters['Domicile']).length, e = Object.keys(rosters['Extérieur']).length;
+  document.getElementById('roster-summary').textContent = (d || e)
+    ? labelFor('Domicile') + ' : ' + d + ' joueur' + (d > 1 ? 's' : '') + ' · ' + labelFor('Extérieur') + ' : ' + e + ' joueur' + (e > 1 ? 's' : '')
+    : 'Aucune feuille de match enregistrée.';
+}
+function updatePlayerHints(){
+  const t = document.getElementById('cd-team').value, n = document.getElementById('cd-num').value;
+  const nm = playerName(t, n);
+  document.getElementById('cd-hint').textContent = n !== '' ? (nm ? 'n°' + n + ' : ' + nm : (Object.keys(rosters[t]).length ? 'n°' + n + ' : inconnu sur la feuille de match' : '')) : '';
+  const st = document.getElementById('sb-team').value, o = document.getElementById('sb-out').value, i = document.getElementById('sb-in').value;
+  const parts = [];
+  if(o !== '' && playerName(st, o)) parts.push('Sort : ' + playerName(st, o));
+  if(i !== '' && playerName(st, i)) parts.push('Entre : ' + playerName(st, i));
+  document.getElementById('sb-hint').textContent = parts.join(' · ');
+}
+['cd-team','cd-num','sb-team','sb-out','sb-in'].forEach(id => {
+  const el = document.getElementById(id); el.addEventListener('input', updatePlayerHints); el.addEventListener('change', updatePlayerHints);
+});
+function rosterToText(team){
+  return Object.keys(rosters[team]).map(n => parseInt(n,10)).sort((a,b) => a-b).map(n => n + ' ' + rosters[team][n]).join('\n');
+}
+function parseTeamLines(txt){
+  const out = {};
+  String(txt || '').split(/\r?\n/).forEach(l => {
+    const m = l.trim().match(/^(\d{1,2})\s*[.\-–):]?\s+(.+)$/);
+    if(m){ const n = parseInt(m[1],10); const name = m[2].replace(/\s+/g,' ').trim(); if(n >= 1 && n <= 99 && name) out[n] = name; }
+  });
+  return out;
+}
+// Lit un texte de feuille de match (OCR ou collé) et répartit les joueurs entre les deux équipes.
+// Gère les feuilles où les deux équipes sont côte à côte sur la même ligne (recevante à gauche).
+function parseRosterText(raw){
+  const res = { 'Domicile': [], 'Extérieur': [] };
+  const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const dom = norm(document.getElementById('f-club-dom').value), ext = norm(document.getElementById('f-club-ext').value);
+  let lines = String(raw || '').split(/\r?\n/);
+  const iComp = lines.findIndex(l => /composition/i.test(l));
+  if(iComp >= 0) lines = lines.slice(iComp + 1);
+  const iBanc = lines.findIndex(l => /^\W*banc\b/i.test(l.trim()));
+  if(iBanc >= 0) lines = lines.slice(0, iBanc);
+  const SKIP_LINE = /arbitre|assistant|d[ée]l[ée]gu|adjoint|technicien|m[ée]decin|[ée]quipe|officiel|r[ée]sultat|terrain|comp[ée]tition/i;
+  const SKIP_NAME = /licen|dirigeant|entraineur|educateur|remplacant|capitaine|staff|signature/;
+  const seen = { 'Domicile': new Set(), 'Extérieur': new Set() };
+  let cur = 'Domicile';
+  const add = (team, num, name) => {
+    name = name.replace(/\s+['’`]?\s*a?\s*pas\b.*$/i, ' ').replace(/\s+['’`]\s*\S*$/, ' ').replace(/(^|\s)[A-Za-z](?=\s|$)/g, ' ').replace(/\s+/g,' ').trim();
+    if(num < 1 || num > 99 || name.length < 3 || SKIP_NAME.test(norm(name)) || seen[team].has(num)) return false;
+    seen[team].add(num); res[team].push(num + ' ' + name); return true;
+  };
+  lines.forEach(line => {
+    let l = line.replace(/[|\[\]\\!_]+/g, ' ');
+    l = l.replace(/(\d)\s*\/\s*(?=[A-Za-zÀ-ÿ])/g, '$1 ');
+    l = l.replace(/\([^)]*\)/g, ' ').replace(/N['’]a pas particip\S*/gi, ' ').replace(/\b[A-Za-z]?\d{6,}\b/g, ' ');
+    l = l.replace(/\s+/g, ' ').trim();
+    if(!l) return;
+    if(SKIP_LINE.test(l)) return;
+    // chiffre lu comme une lettre (5 → S) devant un nom en majuscules
+    l = l.replace(/(^|\s)[Ss]\s+(?=[A-ZÀ-Ý]{2})/g, '$15 ');
+    const ms = Array.from(l.matchAll(/(?:^|\s)(\d{1,2})\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*)*?)(?=\s+\d{1,2}\s+[A-Za-zÀ-ÿ]|\s*$)/g));
+    if(ms.length >= 2){
+      add('Domicile', parseInt(ms[0][1],10), ms[0][2]);
+      add('Extérieur', parseInt(ms[1][1],10), ms[1][2]);
+      return;
+    }
+    if(ms.length === 1){
+      const num = parseInt(ms[0][1],10), name = ms[0][2];
+      // un seul joueur lu sur la ligne : à droite de la feuille = équipe visiteuse
+      if(ms[0].index > l.length * 0.4){ add('Extérieur', num, name); return; }
+      if(seen[cur].has(num) && cur === 'Domicile' && seen['Domicile'].size >= 7) cur = 'Extérieur';
+      add(cur, num, name);
+      return;
+    }
+    const nl = norm(l);
+    if(ext.length >= 4 && nl.indexOf(ext) !== -1 && !(dom && nl.indexOf(dom) !== -1)) cur = 'Extérieur';
+    else if(dom.length >= 4 && nl.indexOf(dom) !== -1 && !(ext && nl.indexOf(ext) !== -1)) cur = 'Domicile';
+  });
+  // Les traits verticaux du tableau sont souvent lus comme une lettre (J, I) collée au nom : on la retire si elle est anormalement fréquente
+  ['Domicile','Extérieur'].forEach(t => {
+    const arr = res[t];
+    if(arr.length < 6) return;
+    ['J','I'].forEach(ch => {
+      const withCh = arr.filter(e => { const nm = e.replace(/^\d+\s+/, ''); return nm.charAt(0) === ch && /^[A-ZÀ-Ý]{5,}/.test(nm.split(' ')[0]); });
+      if(withCh.length / arr.length >= 0.3){
+        res[t] = arr.map(e => { const m = e.match(/^(\d+)\s+(.*)$/); return (m[2].charAt(0) === ch && /^[A-ZÀ-Ý]{5,}/.test(m[2].split(' ')[0])) ? m[1] + ' ' + m[2].slice(1) : e; });
+      }
+    });
+  });
+  return res;
+}
+// Prépare l'image pour la lecture : agrandit les petites images (meilleure reconnaissance)
+function prepareForOCR(canvas){
+  if(canvas.width >= 1800) return canvas;
+  const k = Math.min(3, 1800 / canvas.width);
+  const c = document.createElement('canvas'); c.width = Math.round(canvas.width * k); c.height = Math.round(canvas.height * k);
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(canvas, 0, 0, c.width, c.height);
+  return c;
+}
+function showRosterPanel(txtDom, txtExt, raw){
+  const box = document.getElementById('roster-panel');
+  box.innerHTML = '';
+  const wrap = document.createElement('div'); wrap.className = 'desig-panel';
+  const title = document.createElement('b'); title.textContent = 'Vérifiez et corrigez la liste (un joueur par ligne : numéro puis nom)'; wrap.appendChild(title);
+  const grid = document.createElement('div'); grid.className = 'roster-panel-grid';
+  const mk = (label, val, id) => { const d = document.createElement('div'); const l = document.createElement('label'); l.textContent = label; l.style.cssText = "font-family:'Helvetica Neue',Arial,sans-serif;font-size:.75rem;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;"; const t = document.createElement('textarea'); t.id = id; t.value = val; d.appendChild(l); d.appendChild(t); grid.appendChild(d); };
+  mk(labelFor('Domicile'), txtDom, 'roster-txt-dom'); mk(labelFor('Extérieur'), txtExt, 'roster-txt-ext');
+  wrap.appendChild(grid);
+  if(raw){ const det = document.createElement('details'); const sm = document.createElement('summary'); sm.textContent = 'Texte brut lu'; const pre = document.createElement('pre'); pre.textContent = raw; det.appendChild(sm); det.appendChild(pre); wrap.appendChild(det); }
+  const ok = document.createElement('button'); ok.type = 'button'; ok.textContent = 'Enregistrer la feuille de match';
+  const no = document.createElement('button'); no.type = 'button'; no.className = 'alt'; no.textContent = 'Annuler'; no.style.marginLeft = '8px';
+  ok.addEventListener('click', () => {
+    rosters = { 'Domicile': parseTeamLines(document.getElementById('roster-txt-dom').value), 'Extérieur': parseTeamLines(document.getElementById('roster-txt-ext').value) };
+    box.innerHTML = ''; rosterSummary(); rebuildCards(); renderCards(); renderSubs(); updatePlayerHints();
+    document.getElementById('roster-status').textContent = 'Feuille de match enregistrée : les noms s\'affichent maintenant avec les numéros.';
+    autoSaveIfFolderChosen();
+  });
+  no.addEventListener('click', () => { box.innerHTML = ''; });
+  wrap.appendChild(ok); wrap.appendChild(no);
+  box.appendChild(wrap);
+}
+async function readRosterImage(file){
+  if(!file) return;
+  const st = document.getElementById('roster-status');
+  if(!navigator.onLine){ st.textContent = 'Connexion internet nécessaire pour lire la feuille de match.'; return; }
+  try{
+    st.textContent = "Préparation de l'image…";
+    const canvas = prepareForOCR(await imageFileToCanvas(file, 2400));
+    st.textContent = 'Chargement du lecteur de texte (la 1re fois, ça peut prendre une minute)…';
+    await loadScriptOnce(TESSERACT_URL);
+    const res = await Tesseract.recognize(canvas, 'fra', { logger: m => { if(m.status === 'recognizing text') st.textContent = 'Lecture en cours… ' + Math.round((m.progress||0)*100) + ' %'; } });
+    const text = (res && res.data && res.data.text) || '';
+    const r = parseRosterText(text);
+    st.textContent = (r['Domicile'].length + r['Extérieur'].length) ? 'Lecture terminée : vérifiez les deux listes ci-dessous avant d\'enregistrer.' : 'Aucun joueur reconnu : essayez une photo plus nette, ou saisissez la liste à la main.';
+    showRosterPanel(r['Domicile'].join('\n'), r['Extérieur'].join('\n'), text);
+  }catch(e){
+    st.textContent = 'Lecture impossible (' + (e && e.message ? e.message : 'erreur') + '). Vous pouvez saisir ou coller la liste à la main.';
+  }
+}
+document.getElementById('btn-roster-img').addEventListener('click', () => document.getElementById('input-roster').click());
+document.getElementById('input-roster').addEventListener('change', e => { readRosterImage(e.target.files[0]); e.target.value = ''; });
+document.getElementById('btn-roster-edit').addEventListener('click', () => showRosterPanel(rosterToText('Domicile'), rosterToText('Extérieur'), ''));
+['f-club-dom','f-club-ext'].forEach(id => document.getElementById(id).addEventListener('input', rosterSummary));
+rosterSummary();
+
 // --- Cartons (avertissement automatique au 2e jaune) ---
 const cardsListEl = document.getElementById('cards-list');
 const cardsState = {}; // clé "Equipe-numero" -> { jaune: n, rouge: n }
@@ -1646,15 +1817,15 @@ let cardEditIndex = -1;
 function cardView(kind, team, num, count){
   if(kind === 'jaune'){
     return count >= 2
-      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e jaune — joueur n°${num} (${team}) → carton rouge obligatoire !` }
-      : { chipType:'jaune', urgent:false, text:`Carton jaune — joueur n°${num} (${team})` };
+      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e jaune — joueur n°${num}${withName(team,num)} (${team}) → carton rouge obligatoire !` }
+      : { chipType:'jaune', urgent:false, text:`Carton jaune — joueur n°${num}${withName(team,num)} (${team})` };
   }
   if(kind === 'blanc'){
     return count >= 2
-      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e carton blanc — joueur n°${num} (${team}) → carton rouge obligatoire !` }
-      : { chipType:'blanc', urgent:false, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` };
+      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e carton blanc — joueur n°${num}${withName(team,num)} (${team}) → carton rouge obligatoire !` }
+      : { chipType:'blanc', urgent:false, text:`Carton blanc (10 min dehors) — joueur n°${num}${withName(team,num)} (${team})` };
   }
-  return { chipType:'rouge', urgent:false, text:`Carton rouge direct — joueur n°${num} (${team})` };
+  return { chipType:'rouge', urgent:false, text:`Carton rouge direct — joueur n°${num}${withName(team,num)} (${team})` };
 }
 // Recalcule l'affichage et les compteurs (2e jaune, 2e blanc) à partir des saisies, de la plus ancienne à la plus récente
 function rebuildCards(){
@@ -2533,6 +2704,7 @@ function buildMatchData(){
     arrets_de_jeu: stoppageNotifs.slice().reverse(),
     cartons: cardEntries.slice().reverse(),
     remplacements: subEntries.slice().reverse(),
+    feuille_de_match: rosters,
     temps_arret_cumule_secondes: stoppageTotalSec,
     indemnites: (() => {
       const i = computeIndemnites();
@@ -2812,12 +2984,15 @@ function loadMatchData(data){
   }));
 
   // Cartons
+  rosters = { 'Domicile': {}, 'Extérieur': {} };
+  if(data.feuille_de_match){ ['Domicile','Extérieur'].forEach(t => { rosters[t] = Object.assign({}, data.feuille_de_match[t] || {}); }); }
+  rosterSummary();
   subEntries = (data.remplacements || []).slice().reverse();
   renderSubs();
   cardEntries = (data.cartons || []).slice().reverse();
   cardEntries.forEach(c => {
     if(!c.kind || !c.team || !c.num){
-      const m = c.text && c.text.match(/joueur n°(\d+) \((.+?)\)/);
+      const m = c.text && c.text.match(/joueur n°(\d+)[^()]*\((Domicile|Extérieur)\)/);
       const k = !c.text ? null : /jaune/i.test(c.text) ? 'jaune' : /blanc/i.test(c.text) ? 'blanc' : /rouge/i.test(c.text) ? 'rouge' : null;
       if(m && k){ c.num = m[1]; c.team = m[2]; c.kind = k; }
     }
