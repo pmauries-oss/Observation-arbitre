@@ -632,6 +632,7 @@
     animation:notifIn .25s ease;
   }
   .goal-entry .g-min{margin-left:auto;font-weight:700;color:var(--ink-soft);font-size:.76rem;}
+  .cards-wrap{
     padding:18px 28px;
     border-bottom:1px solid var(--line);
     background:#fbfaf7;
@@ -651,6 +652,9 @@
     gap:10px;
     align-items:end;
   }
+  .cards-add.subs-add{grid-template-columns:1fr 110px 110px auto;}
+  .sub-del{margin-left:8px;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:.9rem;}
+  .sub-chip{font-size:1.1rem;line-height:1;flex-shrink:0;}
   .cards-add .field label{margin-bottom:4px;}
   .cards-add input, .cards-add select{
     font-family:inherit;
@@ -945,6 +949,21 @@
           <button type="button" id="cd-add">Enregistrer</button>
         </div>
         <div class="cards-list" id="cards-list"></div>
+      </div>
+      <div class="cards-wrap" id="subs-wrap">
+        <div class="cards-title">Remplacements</div>
+        <div class="cards-add subs-add">
+          <div class="field"><label>Équipe</label>
+            <select id="sb-team">
+              <option value="Domicile" id="sb-opt-dom">Domicile</option>
+              <option value="Extérieur" id="sb-opt-ext">Extérieur</option>
+            </select>
+          </div>
+          <div class="field"><label>N° sortant</label><input type="number" id="sb-out" min="1" max="99" placeholder="ex : 8"></div>
+          <div class="field"><label>N° entrant</label><input type="number" id="sb-in" min="1" max="99" placeholder="ex : 14"></div>
+          <button type="button" id="sb-add">Enregistrer</button>
+        </div>
+        <div class="cards-list" id="subs-list"></div>
       </div>
       <div class="chrono-intro">Notez ce qui se passe minute par minute : décisions, incidents, hors-jeu litigieux, échanges avec l'arbitre… Les entrées sont triées automatiquement par minute.</div>
       <div class="chrono-add">
@@ -1584,19 +1603,116 @@ updateClockDisplay();
 renderClockLog();
 updateDurationInfo();
 
+// --- Remplacements ---
+const subsListEl = document.getElementById('subs-list');
+let subEntries = [];
+function renderSubs(){
+  const dom = document.getElementById('f-club-dom').value.trim();
+  const ext = document.getElementById('f-club-ext').value.trim();
+  document.getElementById('sb-opt-dom').textContent = dom || 'Domicile';
+  document.getElementById('sb-opt-ext').textContent = ext || 'Extérieur';
+  subsListEl.innerHTML = '';
+  subEntries.forEach((e, i) => {
+    const div = document.createElement('div'); div.className = 'card-entry';
+    const chip = document.createElement('span'); chip.className = 'sub-chip'; chip.textContent = '🔁';
+    const txt = document.createElement('span');
+    txt.textContent = 'Remplacement (' + labelFor(e.team) + ') — n°' + e.sortant + ' sort, n°' + e.entrant + ' entre';
+    const mn = document.createElement('span'); mn.className = 'c-min'; mn.textContent = minLabel(e);
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'sub-del'; del.title = 'Supprimer'; del.textContent = '✕';
+    del.addEventListener('click', () => { subEntries.splice(i, 1); renderSubs(); autoSaveIfFolderChosen(); });
+    div.appendChild(chip); div.appendChild(txt); div.appendChild(mn); div.appendChild(del);
+    subsListEl.appendChild(div);
+  });
+}
+document.getElementById('sb-add').addEventListener('click', () => {
+  const outEl = document.getElementById('sb-out'), inEl = document.getElementById('sb-in');
+  if(outEl.value === ''){ outEl.focus(); return; }
+  if(inEl.value === ''){ inEl.focus(); return; }
+  const st = liveStamp();
+  subEntries.unshift({ team: document.getElementById('sb-team').value, sortant: outEl.value, entrant: inEl.value, min: st.min, per: st.per, lab: st.lab });
+  outEl.value = ''; inEl.value = ''; outEl.focus();
+  renderSubs(); autoSaveIfFolderChosen();
+});
+document.getElementById('sb-in').addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('sb-add').click(); } });
+['f-club-dom','f-club-ext'].forEach(id => document.getElementById(id).addEventListener('input', renderSubs));
+renderSubs();
+
 // --- Cartons (avertissement automatique au 2e jaune) ---
 const cardsListEl = document.getElementById('cards-list');
 const cardsState = {}; // clé "Equipe-numero" -> { jaune: n, rouge: n }
 let cardEntries = [];
 
+let cardEditIndex = -1;
+function cardView(kind, team, num, count){
+  if(kind === 'jaune'){
+    return count >= 2
+      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e jaune — joueur n°${num} (${team}) → carton rouge obligatoire !` }
+      : { chipType:'jaune', urgent:false, text:`Carton jaune — joueur n°${num} (${team})` };
+  }
+  if(kind === 'blanc'){
+    return count >= 2
+      ? { chipType:'rouge', urgent:true, text:`⚠️ 2e carton blanc — joueur n°${num} (${team}) → carton rouge obligatoire !` }
+      : { chipType:'blanc', urgent:false, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` };
+  }
+  return { chipType:'rouge', urgent:false, text:`Carton rouge direct — joueur n°${num} (${team})` };
+}
+// Recalcule l'affichage et les compteurs (2e jaune, 2e blanc) à partir des saisies, de la plus ancienne à la plus récente
+function rebuildCards(){
+  Object.keys(cardsState).forEach(k => delete cardsState[k]);
+  for(let i = cardEntries.length - 1; i >= 0; i--){
+    const c = cardEntries[i];
+    if(!c.kind || !c.team || !c.num) continue;
+    const key = c.team + '-' + c.num;
+    if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
+    cardsState[key][c.kind]++;
+    Object.assign(c, cardView(c.kind, c.team, c.num, cardsState[key][c.kind]));
+  }
+}
+function cardTeamOptions(sel){
+  const dom = document.getElementById('f-club-dom').value.trim() || 'Domicile';
+  const ext = document.getElementById('f-club-ext').value.trim() || 'Extérieur';
+  return `<option value="Domicile"${sel==='Domicile'?' selected':''}>${esc(dom)}</option><option value="Extérieur"${sel==='Extérieur'?' selected':''}>${esc(ext)}</option>`;
+}
 function renderCards(){
-  cardsListEl.innerHTML = cardEntries.map(c => `
-    <div class="card-entry${c.urgent ? ' urgent' : ''}">
-      <span class="card-chip ${c.chipType}"></span>
-      <span>${c.text}</span>
-      <span class="c-min">${minLabel(c)}</span>
-    </div>
-  `).join('');
+  cardsListEl.innerHTML = '';
+  cardEntries.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'card-entry' + (c.urgent ? ' urgent' : '');
+    const editable = !!(c.kind && c.team && c.num);
+    if(i === cardEditIndex && editable){
+      div.style.flexWrap = 'wrap';
+      div.innerHTML = `<select data-f="team">${cardTeamOptions(c.team)}</select>
+        <input data-f="num" type="number" min="1" max="99" value="${esc(c.num)}" style="width:70px;">
+        <select data-f="kind"><option value="jaune">Jaune</option><option value="blanc">Blanc</option><option value="rouge">Rouge direct</option></select>
+        <button type="button" class="card-ok">Valider</button><button type="button" class="card-cancel">Annuler</button>`;
+      div.querySelector('[data-f="kind"]').value = c.kind;
+      div.querySelector('.card-ok').addEventListener('click', () => {
+        const n = div.querySelector('[data-f="num"]').value;
+        if(n === ''){ div.querySelector('[data-f="num"]').focus(); return; }
+        c.team = div.querySelector('[data-f="team"]').value;
+        c.num = n; c.kind = div.querySelector('[data-f="kind"]').value;
+        cardEditIndex = -1; rebuildCards(); renderCards(); autoSaveIfFolderChosen();
+      });
+      div.querySelector('.card-cancel').addEventListener('click', () => { cardEditIndex = -1; renderCards(); });
+    } else {
+      const chip = document.createElement('span'); chip.className = 'card-chip ' + c.chipType;
+      const txt = document.createElement('span'); txt.textContent = c.text;
+      const mn = document.createElement('span'); mn.className = 'c-min'; mn.textContent = minLabel(c);
+      div.appendChild(chip); div.appendChild(txt); div.appendChild(mn);
+      if(editable){
+        const ed = document.createElement('button'); ed.type = 'button'; ed.className = 'sub-del'; ed.title = 'Modifier'; ed.textContent = '✎';
+        ed.addEventListener('click', () => { cardEditIndex = i; renderCards(); });
+        div.appendChild(ed);
+      }
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'sub-del'; del.title = 'Supprimer'; del.textContent = '✕';
+      del.addEventListener('click', () => {
+        if(!confirm('Supprimer ce carton ?')) return;
+        cardEntries.splice(i, 1); cardEditIndex = -1; rebuildCards(); renderCards(); autoSaveIfFolderChosen();
+      });
+      div.appendChild(del);
+    }
+    cardsListEl.appendChild(div);
+  });
 }
 
 document.getElementById('cd-add').addEventListener('click', () => {
@@ -1605,35 +1721,9 @@ document.getElementById('cd-add').addEventListener('click', () => {
   const num = numEl.value;
   const type = document.getElementById('cd-type').value;
   if(num === ''){ numEl.focus(); return; }
-
-  const stamp = liveStamp(); const min = stamp.min, per = stamp.per, lab = stamp.lab;
-  const key = team + '-' + num;
-  if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
-
-  if(type === 'jaune'){
-    cardsState[key].jaune++;
-    if(cardsState[key].jaune >= 2){
-      cardEntries.unshift({
-        chipType:'rouge', urgent:true, min, per, lab,
-        text: `⚠️ 2e jaune — joueur n°${num} (${team}) → carton rouge obligatoire !`
-      });
-    } else {
-      cardEntries.unshift({ chipType:'jaune', urgent:false, min, per, lab, text:`Carton jaune — joueur n°${num} (${team})` });
-    }
-  } else if(type === 'blanc'){
-    cardsState[key].blanc++;
-    if(cardsState[key].blanc >= 2){
-      cardEntries.unshift({
-        chipType:'rouge', urgent:true, min, per, lab,
-        text: `⚠️ 2e carton blanc — joueur n°${num} (${team}) → carton rouge obligatoire !`
-      });
-    } else {
-      cardEntries.unshift({ chipType:'blanc', urgent:false, min, per, lab, text:`Carton blanc (10 min dehors) — joueur n°${num} (${team})` });
-    }
-  } else {
-    cardsState[key].rouge++;
-    cardEntries.unshift({ chipType:'rouge', urgent:false, min, per, lab, text:`Carton rouge direct — joueur n°${num} (${team})` });
-  }
+  const stamp = liveStamp();
+  cardEntries.unshift({ kind:type, team, num, min:stamp.min, per:stamp.per, lab:stamp.lab, chipType:'jaune', urgent:false, text:'' });
+  rebuildCards();
   numEl.value = '';
   numEl.focus();
   renderCards();
@@ -2442,6 +2532,7 @@ function buildMatchData(){
     buts: goalEntries.slice().reverse().map(g => ({ minute: g.min, periode: g.per, libelle: g.lab, equipe: labelFor(g.team) })),
     arrets_de_jeu: stoppageNotifs.slice().reverse(),
     cartons: cardEntries.slice().reverse(),
+    remplacements: subEntries.slice().reverse(),
     temps_arret_cumule_secondes: stoppageTotalSec,
     indemnites: (() => {
       const i = computeIndemnites();
@@ -2721,19 +2812,19 @@ function loadMatchData(data){
   }));
 
   // Cartons
+  subEntries = (data.remplacements || []).slice().reverse();
+  renderSubs();
   cardEntries = (data.cartons || []).slice().reverse();
-  Object.keys(cardsState).forEach(k => delete cardsState[k]);
-  // reconstruit les compteurs par joueur à partir du texte des cartons (best-effort)
-  (data.cartons || []).forEach(c => {
-    const mJaune = c.text && c.text.match(/joueur n°(\d+) \((.+?)\)/);
-    if(mJaune){
-      const key = mJaune[2] + '-' + mJaune[1];
-      if(!cardsState[key]) cardsState[key] = { jaune:0, blanc:0, rouge:0 };
-      if(c.chipType === 'jaune') cardsState[key].jaune++;
-      else if(c.chipType === 'blanc') cardsState[key].blanc++;
-      else if(c.chipType === 'rouge') cardsState[key].rouge++;
+  cardEntries.forEach(c => {
+    if(!c.kind || !c.team || !c.num){
+      const m = c.text && c.text.match(/joueur n°(\d+) \((.+?)\)/);
+      const k = !c.text ? null : /jaune/i.test(c.text) ? 'jaune' : /blanc/i.test(c.text) ? 'blanc' : /rouge/i.test(c.text) ? 'rouge' : null;
+      if(m && k){ c.num = m[1]; c.team = m[2]; c.kind = k; }
     }
   });
+  cardEditIndex = -1;
+  rebuildCards();
+  renderCards();
 
   // Arrêts de jeu et temps cumulé
   stoppageNotifs = (data.arrets_de_jeu || []).slice().reverse();
