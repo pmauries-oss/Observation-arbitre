@@ -1710,7 +1710,7 @@ function parseRosterText(raw){
   const seen = { 'Domicile': new Set(), 'Extérieur': new Set() };
   let cur = 'Domicile';
   const add = (team, num, name) => {
-    name = name.replace(/\s+['’`]?\s*a?\s*pas\b.*$/i, ' ').replace(/\s+['’`]\s*\S*$/, ' ').replace(/(^|\s)[A-Za-z](?=\s|$)/g, ' ').replace(/\s+/g,' ').trim();
+    name = name.replace(/\s+N['’`]?\s*a\b.*$/i, ' ').replace(/\s+['’`]?\s*a?\s*pas\b.*$/i, ' ').replace(/\s+['’`]\s*\S*$/, ' ').replace(/(^|\s)[A-Za-z](?=\s|$)/g, ' ').replace(/\s+/g,' ').trim();
     if(num < 1 || num > 99 || name.length < 3 || SKIP_NAME.test(norm(name)) || seen[team].has(num)) return false;
     seen[team].add(num); res[team].push(num + ' ' + name); return true;
   };
@@ -1754,13 +1754,28 @@ function parseRosterText(raw){
   });
   return res;
 }
-// Prépare l'image pour la lecture : agrandit les petites images (meilleure reconnaissance)
+// Prépare l'image pour la lecture : efface les traits bleus du tableau (feuille de match FFF), éclaircit le fond, puis agrandit
 function prepareForOCR(canvas){
-  if(canvas.width >= 1800) return canvas;
-  const k = Math.min(3, 1800 / canvas.width);
-  const c = document.createElement('canvas'); c.width = Math.round(canvas.width * k); c.height = Math.round(canvas.height * k);
-  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(canvas, 0, 0, c.width, c.height);
-  return c;
+  let src = canvas;
+  try{
+    const c0 = document.createElement('canvas'); c0.width = canvas.width; c0.height = canvas.height;
+    const x0 = c0.getContext('2d'); x0.drawImage(canvas, 0, 0);
+    const img = x0.getImageData(0, 0, c0.width, c0.height), d = img.data;
+    for(let i = 0; i < d.length; i += 4){
+      const r = d[i], g = d[i+1], b = d[i+2];
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      if((b - Math.max(r, g)) > 20 || lum > 185){ d[i] = d[i+1] = d[i+2] = 255; }
+    }
+    x0.putImageData(img, 0, 0);
+    src = c0;
+  }catch(e){ src = canvas; }
+  if(src.width < 1800){
+    const k = Math.min(3, 1800 / src.width);
+    const c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
+    return c;
+  }
+  return src;
 }
 function showRosterPanel(txtDom, txtExt, raw){
   const box = document.getElementById('roster-panel');
